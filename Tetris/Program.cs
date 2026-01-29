@@ -241,20 +241,22 @@ namespace Tetris
 
             ITransform[] existingTransforms = new ITransform[0];
 
+            DateTime time = DateTime.Now;
+
             while (!Input.Program.currentInputs.Contains(Input.Program.Input.Exit))
             {
-                nextBlock.Rotate(currentPrototype);
                 objects.Add(nextBlock);
                 (nextBlock, currentPrototype) = GenerateBlock(ref blockPool, blockPrototypes, ref rng);
                 
                 for (int i = 0; i < 100; i++)
                 {
-                    DrawFrame();
+                    DrawFrame(ref time);
                     Thread.Sleep(10);
                 }
 
                 
                 Thread.Sleep(1000);
+                objects = new List<ITransform>();
                 Console.Clear();
             }
 
@@ -263,10 +265,10 @@ namespace Tetris
             Console.Clear();
         }
 
-        static void DrawFrame()
+        static void DrawFrame(ref DateTime startTime)
         {
-            Console.Clear();
 
+            float deltaTime = (float)(DateTime.Now - startTime).TotalSeconds;
             if (objects != null)
             {
 
@@ -274,13 +276,14 @@ namespace Tetris
                 {
                     if (item.CanEverTick())
                     {
-                        item.Tick(0);
+                        item.Tick(deltaTime);
                     }
 
                     item.Draw();
-                    Console.WriteLine("Drew item: " + item.GetType().ToString());
                 }
             }
+
+            startTime = DateTime.Now;
 
         }
 
@@ -327,6 +330,7 @@ namespace Tetris
         public SpaceInfo position;
         public Byte[] currentShape;
         public Byte width;
+        private float time;
 
         /// <summary>
         /// If the block is "placed", it can no longer move
@@ -389,21 +393,54 @@ namespace Tetris
             this.prototype.color = Programm.backgroundColor;
             this.position = originalSpace;
 
+            if (this.position.rotation != newPos.rotation)
+            {
+                this.position.rotation -= 1;
+                Rotate(this.prototype);
+            }
+
             // Delete the original position
             this.Draw();
+
 
             // Redraw in new position
             this.position = newPos;
             this.prototype.color = colour;
+
+            if (this.position.rotation != originalSpace.rotation)
+            {
+                this.position.rotation -= 1;
+                Rotate(this.prototype);
+            }
             this.Draw();
         }
 
         public void Tick(float deltaTime)
         {
             if (this.placed) { return; }
+            this.time += deltaTime;
+            var position = this.position;
+            bool needsRedrawing = false;
+
             if (Input.Program.ProcessKey(Input.Program.Input.RotateUp))
             {
+                
                 Rotate(this.prototype);
+
+                needsRedrawing = true;
+            }
+
+
+            if (this.time > 1) {
+                this.time = 0;
+                this.position.posY += 1;
+
+                needsRedrawing = true;
+            }
+
+            if (needsRedrawing)
+            {
+                Redraw(position);
             }
         }
 
@@ -428,6 +465,8 @@ namespace Tetris
                             }
                             contents <<= 1;
                         }
+
+                        this.currentShape[i] = contents;
                     }
                     break;
 
@@ -457,6 +496,54 @@ namespace Tetris
                         this.currentShape[i] = contents;
                     }
                     break;
+
+                case 2:
+                    this.currentShape = new Byte[prototype.shape.GetLength(0)];
+                    var height_ = this.currentShape.GetLength(0);
+                    for (int i = 0; i < height_; i++)
+                    {
+                        Byte contents = 0;
+
+                        for (int j = 0; j < this.width; j++)
+                        {
+                            bool filled = prototype.shape[i, j];
+                            if (filled)
+                            {
+                                contents |= 1;
+                            }
+                            contents <<= 1;
+                        }
+
+                        this.currentShape[height_ - i - 1] = contents;
+                    }
+                    break;
+                case 3:
+                    this.width = (byte)prototype.shape.GetLength(1);
+                    var height__ = this.currentShape.GetLength(0);
+                    var width_ = this.width;
+                    this.currentShape = new Byte[width_];
+
+
+
+                    for (int i = 0; i < width_; i++)
+                    {
+                        Byte contents = 0;
+
+                        for (int j = 0; j < height__; j++)
+                        {
+                            bool filled = prototype.shape[j, i];
+                            if (filled)
+                            {
+                                contents |= 1;
+                            }
+                            contents <<= 1;
+                        }
+
+
+                        this.currentShape[width_-i-1] = contents;
+                    }
+                    break;
+
                 default: throw new Exception();
             }
         }
@@ -473,6 +560,7 @@ namespace Tetris
             this.width = (byte)prototype.shape.GetLength(1);
             this.currentShape = new Byte[prototype.shape.GetLength(0)];
             this.placed = false;
+            this.time = 0;
 
             for (int i = 0; i < this.currentShape.GetLength(0); i++)
             {
