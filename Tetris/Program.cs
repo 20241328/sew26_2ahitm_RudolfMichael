@@ -3,10 +3,14 @@ using System.Collections.Generic;
 using System.Data;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices.ComTypes;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using Tetris;
 
 namespace Tetris
 {
@@ -14,6 +18,7 @@ namespace Tetris
 
     internal class Programm
     {
+        private static List<ITransform> objects = new List<ITransform>();
         public static bool slowDownDrawing = false;
         public static ConsoleColor backgroundColor = ConsoleColor.Black;
         public static BlockPrototype[] blockPrototypes = { 
@@ -21,14 +26,70 @@ namespace Tetris
                         ConsoleColor.Blue,
                         new bool[,]
                         {
-                            { true },
-                            { true },
-                            { true },
-                            { true }
+                            { true, false, false, false },
+                            { true, false, false, false },
+                            { true, false, false, false },
+                            { true, false, false, false }
                         },
                         "I"
+                    ),
+                new BlockPrototype(
+                        ConsoleColor.Magenta,
+                        new bool[,]
+                        {
+                            { true, false, false },
+                            { true, true, false },
+                            { true, false, false },
+                        },
+                        ">"
+                    ),
+                new BlockPrototype(
+                        ConsoleColor.Green,
+                        new bool[,]
+                        {
+                            { true, false, false },
+                            { true, true, false },
+                            { false, true, false },
+                        },
+                        "Z"
+                    ),
+                 new BlockPrototype(
+                        ConsoleColor.Red,
+                        new bool[,]
+                        {
+                            { false, true, false },
+                            { true, true, false },
+                            { true, false, false },
+                        },
+                        "S"
+                    ),
+                  new BlockPrototype(
+                        ConsoleColor.DarkYellow,
+                        new bool[,]
+                        {
+                            { true, true, true, true },
+                            { true, false, false, false },
+                            { false, false, false, false },
+                            { false, false, false, false }
+                        },
+                        "L"
+                    ),
+                   new BlockPrototype(
+                        ConsoleColor.Yellow,
+                        new bool[,]
+                        {
+                            { true, true },
+                            { true, true },
+                        },
+                        "O"
                     )
             };
+
+        public static byte START_X = 5;
+        public static byte START_Y = 5;
+        public static byte NEXT_POS_X = 20;
+        public static byte NEXT_POS_Y = 5;
+        public static bool SKIP_TITLE = true;
 
 
         public static BlockPrototype[] letters = {
@@ -111,8 +172,11 @@ namespace Tetris
 
         static void Main(string[] args)
         {
-            Console.WriteLine("Starting Helper...");
-            Thread.Sleep(1000);
+            if (!SKIP_TITLE)
+            {
+                Console.WriteLine("Starting Helper...");
+                Thread.Sleep(1000);
+            }
 
 
             Console.Clear();
@@ -121,9 +185,36 @@ namespace Tetris
             Console.SetWindowSize(152, 40);
             Console.Clear();
 
+            if (!SKIP_TITLE)
+            {
+                ShowTitle();
+            }
+
+
+            
+
+            string[] options = new string[] { "Start Game", "Leaderboard", "Settings", "Quit", "Manual"};
+            int selectedOption = 0;
+           
+            
+
+            while (!Input.Program.currentInputs.Contains(Input.Program.Input.Exit))
+            {
+                Input.Program.MenuAusgabe(ref selectedOption, options);
+
+                switch (selectedOption)
+                {
+                    case 0:
+                        ShowGame();
+                        break;
+                    default: break;
+                }
+            }
+        }
+
+        public static void ShowTitle()
+        {
             int charOffset = 1;
-
-
             foreach (BlockPrototype prototype in letters)
             {
                 int letterOffset = charOffset * Block.tileWidth;
@@ -135,11 +226,80 @@ namespace Tetris
 
             Thread.Sleep(4000);
             Console.Clear();
+        }
 
-            string[] options = new string[] { "Start Game", "Leaderboard", "Settings", "Quit", "Manual"};
-            int selectedOption = 0;
-           
-            Input.Program.MenuAusgabe(ref selectedOption, options);
+
+        static void ShowGame()
+        {
+            Console.Clear();
+
+            Block[] blocks = new Block[0];
+            List<BlockPrototype> blockPool = new List<BlockPrototype>();
+            Random rng = new Random();
+
+            (Block nextBlock, BlockPrototype currentPrototype) = GenerateBlock(ref blockPool, blockPrototypes, ref rng);
+
+            ITransform[] existingTransforms = new ITransform[0];
+
+            while (!Input.Program.currentInputs.Contains(Input.Program.Input.Exit))
+            {
+                nextBlock.Rotate(currentPrototype);
+                objects.Add(nextBlock);
+                (nextBlock, currentPrototype) = GenerateBlock(ref blockPool, blockPrototypes, ref rng);
+                
+                for (int i = 0; i < 100; i++)
+                {
+                    DrawFrame();
+                    Thread.Sleep(10);
+                }
+
+                
+                Thread.Sleep(1000);
+                Console.Clear();
+            }
+
+            Input.Program.currentInputs.Clear();
+
+            Console.Clear();
+        }
+
+        static void DrawFrame()
+        {
+            Console.Clear();
+
+            if (objects != null)
+            {
+
+                foreach (var item in objects)
+                {
+                    if (item.CanEverTick())
+                    {
+                        item.Tick(0);
+                    }
+
+                    item.Draw();
+                    Console.WriteLine("Drew item: " + item.GetType().ToString());
+                }
+            }
+
+        }
+
+        static (Block, BlockPrototype) GenerateBlock(ref List<BlockPrototype> pool, BlockPrototype[] allBlocks, ref Random rng)
+        {
+            if (pool.Count == 0)
+            {
+                pool = allBlocks.ToList();
+            }
+
+            
+            int index = rng.Next(0, pool.Count);
+
+            BlockPrototype prototype = pool[index];
+            pool.RemoveAt(index);
+
+            var block = new Block(prototype, START_X, START_Y);
+
+            return (block, prototype);
         }
     }
 
@@ -168,6 +328,11 @@ namespace Tetris
         public Byte[] currentShape;
         public Byte width;
 
+        /// <summary>
+        /// If the block is "placed", it can no longer move
+        /// </summary>
+        public bool placed;
+
         public void Draw()
         {
             Console.SetCursorPosition(position.posX, position.posY);
@@ -189,7 +354,6 @@ namespace Tetris
                     for (int x = 0; x < width; x++)
                     {
                         bool filled = (rowContents >> (width - x) & 0x1) == 1;
-                        //Console.WriteLine("filled: " + filled);
 
                         if (!filled)
                         {
@@ -220,12 +384,81 @@ namespace Tetris
 
         public void Redraw(SpaceInfo originalSpace)
         {
-            throw new NotImplementedException();
+            var newPos = this.position;
+            var colour = this.prototype.color;
+            this.prototype.color = Programm.backgroundColor;
+            this.position = originalSpace;
+
+            // Delete the original position
+            this.Draw();
+
+            // Redraw in new position
+            this.position = newPos;
+            this.prototype.color = colour;
+            this.Draw();
         }
 
         public void Tick(float deltaTime)
         {
-            
+            if (this.placed) { return; }
+            if (Input.Program.ProcessKey(Input.Program.Input.RotateUp))
+            {
+                Rotate(this.prototype);
+            }
+        }
+
+        public void Rotate(BlockPrototype prototype)
+        {
+            this.position.rotation = (byte)((this.position.rotation + 1) % 4);
+
+            switch (this.position.rotation)
+            {
+                case 0:
+                    this.currentShape = new Byte[prototype.shape.GetLength(0)];
+                    for (int i = 0; i < this.currentShape.GetLength(0); i++)
+                    {
+                        Byte contents = 0;
+
+                        for (int j = 0; j < this.width; j++)
+                        {
+                            bool filled = prototype.shape[i, j];
+                            if (filled)
+                            {
+                                contents |= 1;
+                            }
+                            contents <<= 1;
+                        }
+                    }
+                    break;
+
+                case 1:
+                    this.width = (byte)prototype.shape.GetLength(1);
+                    var height = this.currentShape.GetLength(0);
+                    var width = this.width;
+                    this.currentShape = new Byte[width];
+
+                    
+
+                    for (int i = 0; i < width; i++)
+                    {
+                        Byte contents = 0;
+
+                        for (int j = 0; j < height; j++)
+                        {
+                            bool filled = prototype.shape[j, i];
+                            if (filled)
+                            {
+                                contents |= 1;
+                            }
+                            contents <<= 1;
+                        }
+
+
+                        this.currentShape[i] = contents;
+                    }
+                    break;
+                default: throw new Exception();
+            }
         }
 
         public bool CanEverTick()
@@ -239,6 +472,7 @@ namespace Tetris
             this.position = new SpaceInfo(x, y);
             this.width = (byte)prototype.shape.GetLength(1);
             this.currentShape = new Byte[prototype.shape.GetLength(0)];
+            this.placed = false;
 
             for (int i = 0; i < this.currentShape.GetLength(0); i++)
             {
@@ -297,6 +531,49 @@ namespace Tetris
     }
 }
 
+namespace GameLogic
+{
+    internal class GameThread
+    {
+        private static List<ITransform> tickingObjects;
+        public static void Start()
+        {
+            tickingObjects = new List<ITransform>();
+            while (Input.Program.running)
+            {
+                Tick();
+            }
+        }
+
+        private static void Tick()
+        {
+            if (tickingObjects.Count != 0)
+            {
+                foreach (ITransform gObject in tickingObjects.ToArray())
+                {
+                    if (gObject == null) { continue; }
+                    gObject.Tick(0);
+                }
+            } else
+            {
+
+            }
+        }
+
+        public static void AddGameObject(ITransform gObject)
+        {
+            tickingObjects.Add(gObject);
+
+            Console.WriteLine($"Ticking objects: {tickingObjects}");
+        }
+
+        public static ITransform[] GetObjects()
+        {
+            return tickingObjects.ToArray();
+        }
+    }
+}
+
 namespace Input
 {
     internal class Program
@@ -312,7 +589,7 @@ namespace Input
             ConsoleKeyInfo ein;
             ConsoleKey key;
 
-            while (!currentInputs.Contains(Input.Exit))
+            while (running)
             {
                 ein = Console.ReadKey(true);
                 key = ein.Key;
@@ -334,7 +611,8 @@ namespace Input
         {
              Left,
              Right, 
-             Rotate,
+             RotateUp,
+             RotateDown,
              Select,
              Exit,
         }
@@ -344,7 +622,9 @@ namespace Input
             switch (key)
             {
                 case ConsoleKey.UpArrow:
-                    return Input.Rotate;
+                    return Input.RotateUp;
+                case ConsoleKey.DownArrow:
+                    return Input.RotateDown;
                 case ConsoleKey.LeftArrow:
                     return Input.Left;
                 case ConsoleKey.RightArrow:
@@ -370,7 +650,9 @@ namespace Input
 
             // parallele Methode zum Einlesen des Tastendrucks
             var myThread = new System.Threading.Thread(Eingabe);
+            var gameLogicThread = new Thread(GameLogic.GameThread.Start);
             myThread.Start();
+            gameLogicThread.Start();
 
 
             Console.BackgroundColor = ConsoleColor.Black;
@@ -438,7 +720,7 @@ namespace Input
 
             while (!currentInputs.Contains(Input.Exit))
             {
-                if (ProcessKey(Input.Left))
+                if (ProcessKey(Input.RotateUp))
                 {
                     if (selectedEntry > 0)
                     {
@@ -446,7 +728,7 @@ namespace Input
                     }
                 }
 
-                if (ProcessKey(Input.Right))
+                if (ProcessKey(Input.RotateDown))
                 {
                     if (selectedEntry < options.Length - 1)
                     {
@@ -474,6 +756,12 @@ namespace Input
                     Console.WriteLine(" " + options[i]);
                 }
             }
+
+            Program.running = false;
+
+
+            System.Environment.Exit(0);
+
         }
     }
 }
