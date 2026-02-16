@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices.ComTypes;
+using System.Security.AccessControl;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -21,6 +22,7 @@ namespace Tetris
         private static List<ITransform> objects = new List<ITransform>();
         public static bool slowDownDrawing = false;
         public static ConsoleColor backgroundColor = ConsoleColor.Black;
+        public static Byte GRID_END = Input.Program.MAX_Y - 10;
         public static BlockPrototype[] blockPrototypes = { 
                 new BlockPrototype(
                         ConsoleColor.Blue,
@@ -90,6 +92,7 @@ namespace Tetris
         public static byte NEXT_POS_X = 20;
         public static byte NEXT_POS_Y = 5;
         public static bool SKIP_TITLE = true;
+        public static float block_speed = 1;
 
 
         public static BlockPrototype[] letters = {
@@ -182,7 +185,6 @@ namespace Tetris
             Console.Clear();
 
             Input.Program.Start(args);
-            Console.SetWindowSize(152, 40);
             Console.Clear();
 
             if (!SKIP_TITLE)
@@ -247,10 +249,22 @@ namespace Tetris
             {
                 objects.Add(nextBlock);
                 (nextBlock, currentPrototype) = GenerateBlock(ref blockPool, blockPrototypes, ref rng);
-                
-                for (int i = 0; i < 100; i++)
+
+             for (int i = 0; i < 10000; i++)
                 {
-                    DrawFrame(ref time);
+                    foreach (TickFinishedAction action in DrawFrame(ref time))
+                    {
+                        switch (action)
+                        {
+                            case TickFinishedAction.CreateNewBlock:
+                                objects.Add(nextBlock);
+                                (nextBlock, currentPrototype) = GenerateBlock(ref blockPool, blockPrototypes, ref rng);
+                              //  continue outerloop;
+                            default: break;
+                        }
+                    }
+
+
                     Thread.Sleep(10);
                 }
 
@@ -265,8 +279,9 @@ namespace Tetris
             Console.Clear();
         }
 
-        static void DrawFrame(ref DateTime startTime)
+        static TickFinishedAction[] DrawFrame(ref DateTime startTime)
         {
+            TickFinishedAction[] requiredActions = new TickFinishedAction[0] {};
 
             float deltaTime = (float)(DateTime.Now - startTime).TotalSeconds;
             if (objects != null)
@@ -276,14 +291,16 @@ namespace Tetris
                 {
                     if (item.CanEverTick())
                     {
-                        item.Tick(deltaTime);
+                        item.Tick(deltaTime, ref requiredActions);
                     }
 
                     item.Draw();
                 }
             }
 
-            startTime = DateTime.Now;
+
+
+            return requiredActions;
 
         }
 
@@ -306,6 +323,11 @@ namespace Tetris
         }
     }
 
+    public enum TickFinishedAction
+    {
+        CreateNewBlock,
+    }
+
     public class BlockPrototype
     {
         public ConsoleColor color;
@@ -319,7 +341,6 @@ namespace Tetris
             this.name = name;
         }
     }
-
     public struct Block: ITransform
     {
         public const Byte tileWidth = 4;
@@ -415,7 +436,7 @@ namespace Tetris
             this.Draw();
         }
 
-        public void Tick(float deltaTime)
+        public void Tick(float deltaTime, ref TickFinishedAction[] requiredActions)
         {
             if (this.placed) { return; }
             this.time += deltaTime;
@@ -430,10 +451,21 @@ namespace Tetris
                 needsRedrawing = true;
             }
 
+            
 
-            if (this.time > 1) {
+
+            if (this.time > Programm.block_speed) {
                 this.time = 0;
                 this.position.posY += 1;
+
+                
+                if (this.position.posY>=Programm.GRID_END)
+                {
+                    this.placed = true;
+                    this.position.posY -= 1;
+                    Array.Resize(ref requiredActions, requiredActions.Length + 1);
+                    requiredActions[requiredActions.Length - 1] = TickFinishedAction.CreateNewBlock;
+                }
 
                 needsRedrawing = true;
             }
@@ -441,6 +473,7 @@ namespace Tetris
             if (needsRedrawing)
             {
                 Redraw(position);
+                Console.WriteLine($"current: {this.position.posY}, end: {Programm.GRID_END}");
             }
         }
 
@@ -612,7 +645,7 @@ namespace Tetris
 
         SpaceInfo getSpaceInfo();
 
-        void Tick(float deltaTime);
+        void Tick(float deltaTime, ref TickFinishedAction[] requiredActions);
 
         bool CanEverTick();
         
@@ -640,7 +673,7 @@ namespace GameLogic
                 foreach (ITransform gObject in tickingObjects.ToArray())
                 {
                     if (gObject == null) { continue; }
-                    gObject.Tick(0);
+                   // gObject.Tick(0, ref );
                 }
             } else
             {
@@ -671,7 +704,7 @@ namespace Input
 
 
         public const int MAX_X = 150;
-        public const int MAX_Y = 40;
+        public const int MAX_Y = 70;
         static void Eingabe()
         {
             ConsoleKeyInfo ein;
