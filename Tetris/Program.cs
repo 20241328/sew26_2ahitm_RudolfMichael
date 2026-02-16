@@ -22,7 +22,7 @@ namespace Tetris
         private static List<ITransform> objects = new List<ITransform>();
         public static bool slowDownDrawing = false;
         public static ConsoleColor backgroundColor = ConsoleColor.Black;
-        public static Byte GRID_END = Input.Program.MAX_Y - 10;
+        public static Byte GRID_END = (Input.Program.MAX_Y - 10) / Block.tileHeight;
         public static BlockPrototype[] blockPrototypes = { 
                 new BlockPrototype(
                         ConsoleColor.Blue,
@@ -92,7 +92,7 @@ namespace Tetris
         public static byte NEXT_POS_X = 20;
         public static byte NEXT_POS_Y = 5;
         public static bool SKIP_TITLE = true;
-        public static float block_speed = 1;
+        public static float block_speed = 2;
 
 
         public static BlockPrototype[] letters = {
@@ -175,6 +175,7 @@ namespace Tetris
 
         static void Main(string[] args)
         {
+            Console.OutputEncoding = Encoding.UTF8;
             if (!SKIP_TITLE)
             {
                 Console.WriteLine("Starting Helper...");
@@ -259,10 +260,13 @@ namespace Tetris
                             case TickFinishedAction.CreateNewBlock:
                                 objects.Add(nextBlock);
                                 (nextBlock, currentPrototype) = GenerateBlock(ref blockPool, blockPrototypes, ref rng);
-                              //  continue outerloop;
+                                //  continue outerloop;
+                                break;
                             default: break;
                         }
                     }
+
+                    // (int)(ballX)
 
 
                     Thread.Sleep(10);
@@ -375,7 +379,7 @@ namespace Tetris
                 Byte rowContents = currentShape[row];
                 for (int j = 0; j < tileHeight; j++)
                 {
-                    Console.SetCursorPosition(position.posX, position.posY + (row * tileHeight) + j);
+                    Console.SetCursorPosition(position.posX * Block.tileWidth, (position.posY * Block.tileWidth) + (row * tileHeight) + j);
                     for (int x = 0; x < width; x++)
                     {
                         bool filled = (rowContents >> (width - x) & 0x1) == 1;
@@ -400,6 +404,24 @@ namespace Tetris
             }
 
             Console.BackgroundColor = Programm.backgroundColor;
+        }
+
+
+        private int GetHeightBlocks()
+        {
+            int count = 0;
+
+            foreach (byte contents in currentShape)
+            {
+                if (contents == 0)
+                {
+                    return count;
+                }
+
+                count++;
+            }
+
+            return count;
         }
 
         public SpaceInfo getSpaceInfo()
@@ -451,15 +473,28 @@ namespace Tetris
                 needsRedrawing = true;
             }
 
-            
+            if (Input.Program.ProcessKey(Input.Program.Input.Left))
+            {
+                this.position.posX--;
+                needsRedrawing = true;
+            }
+
+            if (Input.Program.ProcessKey(Input.Program.Input.Right))
+            {
+                this.position.posX++;
+                needsRedrawing = true;
+            }
+
+
 
 
             if (this.time > Programm.block_speed) {
                 this.time = 0;
                 this.position.posY += 1;
 
-                
-                if (this.position.posY>=Programm.GRID_END)
+                int lowerEdgePos = this.position.posY + this.GetHeightBlocks();
+                int lowerEdgePosPhysical = lowerEdgePos * Block.tileHeight;
+                if (lowerEdgePosPhysical>=Programm.GRID_END)
                 {
                     this.placed = true;
                     this.position.posY -= 1;
