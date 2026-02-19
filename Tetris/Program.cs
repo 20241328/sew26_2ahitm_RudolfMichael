@@ -23,6 +23,7 @@ namespace Tetris
         public static bool slowDownDrawing = false;
         public static ConsoleColor backgroundColor = ConsoleColor.Black;
         public static Byte GRID_END = (Input.Program.MAX_Y - 10) / Block.tileHeight;
+        public static Byte GRID_WIDTH = 20;
         public static BlockPrototype[] blockPrototypes = { 
                 new BlockPrototype(
                         ConsoleColor.Blue,
@@ -92,8 +93,39 @@ namespace Tetris
         public static byte NEXT_POS_X = 20;
         public static byte NEXT_POS_Y = 5;
         public static bool SKIP_TITLE = true;
-        public static float block_speed = 2;
+        public static float block_speed = 200f;
+        /// <summary>
+        /// The grid that is "set in stone", meaning it doesn't include 
+        /// blocks whilst they are still moving.
+        /// 
+        /// The grid's outer sides are filled with "true"s.
+        /// </summary>
+        private static bool[,] staticGrid;
 
+
+        /// <summary>
+        /// Builds the grid's outer sides as described.
+        /// </summary>
+        private static void SetUpGrid()
+        {
+            staticGrid = new bool[GRID_END + 2, GRID_WIDTH + 2];
+
+            for (int i = 0; i < staticGrid.GetLength(0); i++)
+            {
+                staticGrid[i, 0] = true;
+                staticGrid[i, GRID_WIDTH + 1] = true;
+
+                if (i == 0 || i >= GRID_END)
+                {
+                    for (int j = 1; j < staticGrid.GetLength(1) - 1; j++)
+                    {
+                        staticGrid[i, j] = true;
+                        
+                    }
+                    Console.WriteLine("Zeile vertruet");
+                }
+            }
+        }
 
         public static BlockPrototype[] letters = {
                 new BlockPrototype(
@@ -182,6 +214,10 @@ namespace Tetris
                 Thread.Sleep(1000);
             }
 
+            SetUpGrid();
+            Console.WriteLine($"Last index contains: {staticGrid[Programm.GRID_END + 1, 2]}");
+            Thread.Sleep(2000);
+
 
             Console.Clear();
 
@@ -253,7 +289,7 @@ namespace Tetris
 
              for (int i = 0; i < 10000; i++)
                 {
-                    foreach (TickFinishedAction action in DrawFrame(ref time))
+                    foreach (TickFinishedAction action in DrawFrame(ref time, ref staticGrid))
                     {
                         switch (action)
                         {
@@ -283,7 +319,7 @@ namespace Tetris
             Console.Clear();
         }
 
-        static TickFinishedAction[] DrawFrame(ref DateTime startTime)
+        static TickFinishedAction[] DrawFrame(ref DateTime startTime, ref bool[,] grid)
         {
             TickFinishedAction[] requiredActions = new TickFinishedAction[0] {};
 
@@ -295,7 +331,7 @@ namespace Tetris
                 {
                     if (item.CanEverTick())
                     {
-                        item.Tick(deltaTime, ref requiredActions);
+                        item.Tick(deltaTime, ref requiredActions, ref grid);
                     }
 
                     item.Draw();
@@ -379,7 +415,7 @@ namespace Tetris
                 Byte rowContents = currentShape[row];
                 for (int j = 0; j < tileHeight; j++)
                 {
-                    Console.SetCursorPosition(position.posX * Block.tileWidth, (position.posY * Block.tileWidth) + (row * tileHeight) + j);
+                    Console.SetCursorPosition(position.posX * Block.tileWidth, (position.posY * Block.tileHeight) + (row * tileHeight) + j);
                     for (int x = 0; x < width; x++)
                     {
                         bool filled = (rowContents >> (width - x) & 0x1) == 1;
@@ -458,9 +494,49 @@ namespace Tetris
             this.Draw();
         }
 
-        public void Tick(float deltaTime, ref TickFinishedAction[] requiredActions)
+        private void PlaceInGrid(ref bool[,] currentGrid)
         {
-            if (this.placed) { return; }
+            for (int row = 0; row < currentShape.GetLength(0); row++)
+            {
+                Byte rowContents = currentShape[row];
+                for (int x = 0; x < width; x++)
+                {
+                    bool filled = (rowContents >> (width - x) & 0x1) == 1;
+
+                    if (filled)
+                    {
+                        currentGrid[row + position.posY, x + position.posX] = true;
+                    }
+
+                }
+            }
+        }
+
+
+        private bool InterferesWithGrid(bool[,] previousGrid)
+        { 
+            for (int row = 0; row < currentShape.GetLength(0); row++)
+            {
+                Byte rowContents = currentShape[row];
+                for (int x = 0; x < width; x++)
+                {
+                    bool filled = (rowContents >> (width - x) & 0x1) == 1;
+                    if (filled && previousGrid[row + position.posY, x + position.posX])
+                    {
+                        return true;
+                    }
+
+                }
+            }
+
+            return false;
+        }
+
+        public void Tick(float deltaTime, ref TickFinishedAction[] requiredActions, ref bool[,] grid)
+        {
+            if (this.placed) {
+                return;
+            }
             this.time += deltaTime;
             var position = this.position;
             bool needsRedrawing = false;
@@ -470,19 +546,43 @@ namespace Tetris
                 
                 Rotate(this.prototype);
 
-                needsRedrawing = true;
+                if (InterferesWithGrid(grid))
+                {
+                    Rotate(this.prototype);
+                    Rotate(this.prototype);
+                    Rotate(this.prototype);
+                }
+                else
+                {
+                    needsRedrawing = true;
+                }
             }
 
             if (Input.Program.ProcessKey(Input.Program.Input.Left))
             {
                 this.position.posX--;
-                needsRedrawing = true;
+
+                if (InterferesWithGrid(grid))
+                {
+                    this.position.posX++;
+                }
+                else
+                {
+                    needsRedrawing = true;
+                }
             }
 
             if (Input.Program.ProcessKey(Input.Program.Input.Right))
             {
                 this.position.posX++;
-                needsRedrawing = true;
+
+                if (InterferesWithGrid(grid))
+                {
+                    this.position.posX--;
+                } else
+                {
+                    needsRedrawing = true;
+                }
             }
 
 
@@ -490,14 +590,15 @@ namespace Tetris
 
             if (this.time > Programm.block_speed) {
                 this.time = 0;
-                this.position.posY += 1;
+                this.position.posY++;
 
                 int lowerEdgePos = this.position.posY + this.GetHeightBlocks();
                 int lowerEdgePosPhysical = lowerEdgePos * Block.tileHeight;
-                if (lowerEdgePosPhysical>=Programm.GRID_END)
+                if (InterferesWithGrid(grid)/*lowerEdgePosPhysical>=Programm.GRID_END*/)
                 {
                     this.placed = true;
-                    this.position.posY -= 1;
+                    this.position.posY--;
+                    this.PlaceInGrid(ref grid);
                     Array.Resize(ref requiredActions, requiredActions.Length + 1);
                     requiredActions[requiredActions.Length - 1] = TickFinishedAction.CreateNewBlock;
                 }
@@ -508,7 +609,6 @@ namespace Tetris
             if (needsRedrawing)
             {
                 Redraw(position);
-                Console.WriteLine($"current: {this.position.posY}, end: {Programm.GRID_END}");
             }
         }
 
@@ -680,7 +780,7 @@ namespace Tetris
 
         SpaceInfo getSpaceInfo();
 
-        void Tick(float deltaTime, ref TickFinishedAction[] requiredActions);
+        void Tick(float deltaTime, ref TickFinishedAction[] requiredActions, ref bool[,] grid);
 
         bool CanEverTick();
         
@@ -739,7 +839,7 @@ namespace Input
 
 
         public const int MAX_X = 150;
-        public const int MAX_Y = 70;
+        public const int MAX_Y = 100;
         static void Eingabe()
         {
             ConsoleKeyInfo ein;
