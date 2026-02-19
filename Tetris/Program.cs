@@ -24,7 +24,7 @@ namespace Tetris
         public static ConsoleColor backgroundColor = ConsoleColor.Black;
         public static Byte GRID_END = (Input.Program.MAX_Y - 10) / Block.tileHeight;
         public static Byte GRID_WIDTH = 20;
-        public static BlockPrototype[] blockPrototypes = { 
+        public static BlockPrototype[] blockPrototypes = { /*
                 new BlockPrototype(
                         ConsoleColor.Blue,
                         new bool[,]
@@ -35,7 +35,7 @@ namespace Tetris
                             { true, false, false, false }
                         },
                         "I"
-                    ),
+                    ),*/
                 new BlockPrototype(
                         ConsoleColor.Magenta,
                         new bool[,]
@@ -45,7 +45,7 @@ namespace Tetris
                             { true, false, false },
                         },
                         ">"
-                    ),
+                    ),/*
                 new BlockPrototype(
                         ConsoleColor.Green,
                         new bool[,]
@@ -85,7 +85,7 @@ namespace Tetris
                             { true, true },
                         },
                         "O"
-                    )
+                    )*/
             };
 
         public static byte START_X = 5;
@@ -672,7 +672,7 @@ namespace Tetris
                     {
                         Byte contents = 0;
 
-                        for (int j = 0; j < this.width; j++)
+                        for (int j = this.width - 1; j >= 0; j--)
                         {
                             bool filled = prototype.shape[i, j];
                             if (filled)
