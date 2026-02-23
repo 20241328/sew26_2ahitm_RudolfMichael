@@ -94,7 +94,7 @@ namespace Tetris
         public static byte NEXT_POS_X = 20;
         public static byte NEXT_POS_Y = 5;
         public static bool SKIP_TITLE = true;
-        public static float block_speed = 200f;
+        public static float block_speed = 1f;
         /// <summary>
         /// The grid that is "set in stone", meaning it doesn't include 
         /// blocks whilst they are still moving.
@@ -317,13 +317,29 @@ namespace Tetris
                             case TickFinishedAction.CreateNewBlock:
                                 objects.Add(nextBlock);
                                 (nextBlock, currentPrototype) = GenerateBlock(ref blockPool, blockPrototypes, ref rng);
-                                /*DeleteRow(ref objects, GRID_END-2);
-                                DeleteRow(ref objects, GRID_END - 1);
-                                DeleteRow(ref objects, GRID_END);
-                                DeleteRow(ref objects, GRID_END+1);
-                                DeleteRow(ref objects, GRID_END+2);*/
-                                Console.WriteLine("Deleting");
-                                //  continue outerloop;
+
+                                // A block has been placed, so it needs to be checked if any rows are full
+                                for (int row = 0; row < staticGrid.GetLength(0)-2; row++)
+                                {
+                                    int fulls = 0;
+                                    for (int col = 0; col < staticGrid.GetLength(1); col++)
+                                    {
+                                        if (staticGrid[row, col])
+                                        {
+                                            fulls++;
+                                        }
+                                    }
+
+
+                                    bool fullRow = fulls == staticGrid.GetLength(1);
+                                    
+
+                                    if (fullRow)
+                                    {
+                                        DeleteRow(ref objects, row);
+                                    }
+                                }
+
                                 break;
                             default: break;
                         }
@@ -356,6 +372,11 @@ namespace Tetris
             TickFinishedAction[] requiredActions = new TickFinishedAction[0] {};
 
             float deltaTime = (float)(DateTime.Now - startTime).TotalSeconds;
+            startTime = DateTime.Now;
+
+            Console.SetCursorPosition(0, 1);
+            Console.Write($"FPS: {(int)(1/deltaTime)}; Speed: {block_speed}");
+
             if (objects != null)
             {
 
@@ -667,6 +688,7 @@ namespace Tetris
                 if (InterferesWithGrid(grid)/*lowerEdgePosPhysical>=Programm.GRID_END*/)
                 {
                     Tetris.Programm.score++;
+                    Tetris.Programm.block_speed *= 0.98f;
                     this.placed = true;
                     this.prototype = null;
                     this.position.posY--;
