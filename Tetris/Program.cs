@@ -375,7 +375,7 @@ namespace Tetris
             startTime = DateTime.Now;
 
             Console.SetCursorPosition(0, 1);
-            Console.Write($"FPS: {(int)(1/deltaTime)}; Speed: {block_speed}");
+            Console.Write($"FPS: {(int)(1/deltaTime)}; Speed: {block_speed}, Score: {score}");
 
             if (objects != null)
             {
@@ -390,9 +390,6 @@ namespace Tetris
                     item.Draw();
                 }
             }
-
-            Console.SetCursorPosition(5, 2);
-            Console.Write($"Score: {score}");
 
 
 
@@ -593,6 +590,12 @@ namespace Tetris
                 for (int x = 0; x < width; x++)
                 {
                     bool filled = (rowContents >> (width - x) & 0x1) == 1;
+                    bool filledBefore = currentGrid[row + position.posY, x + position.posX];
+
+                    if (filled & filledBefore)
+                    {
+                        Tetris.Programm.block_speed = float.MaxValue;
+                    }
 
                     if (filled)
                     {
@@ -612,6 +615,19 @@ namespace Tetris
                 for (int x = 0; x < width; x++)
                 {
                     bool filled = (rowContents >> (width - x) & 0x1) == 1;
+
+                    if (!filled) continue;
+
+                    if (previousGrid.GetLength(0) <= row + position.posY || row + position.posY < 0)
+                    {
+                        return true;
+                    }
+
+                    if (previousGrid.GetLength(1) <= x + position.posX || x + position.posX < 0)
+                    {
+                        return true;
+                    }
+
                     if (filled && previousGrid[row + position.posY, x + position.posX])
                     {
                         return true;
@@ -679,7 +695,7 @@ namespace Tetris
 
 
 
-            if (this.time > Programm.block_speed) {
+            if (this.time > Programm.block_speed | Input.Program.ProcessKey(Input.Program.Input.Down)) {
                 this.time = 0;
                 this.position.posY++;
 
@@ -965,7 +981,7 @@ namespace Input
              Left,
              Right, 
              RotateUp,
-             RotateDown,
+             Down,
              Select,
              Exit,
              RemoveLastRow,
@@ -978,7 +994,7 @@ namespace Input
                 case ConsoleKey.UpArrow:
                     return Input.RotateUp;
                 case ConsoleKey.DownArrow:
-                    return Input.RotateDown;
+                    return Input.Down;
                 case ConsoleKey.LeftArrow:
                     return Input.Left;
                 case ConsoleKey.RightArrow:
@@ -1088,7 +1104,7 @@ namespace Input
                     }
                 }
 
-                if (ProcessKey(Input.RotateDown))
+                if (ProcessKey(Input.Down))
                 {
                     Console.SetCursorPosition(0, MAX_Y - 1);
                     Console.Write("-----------------");
