@@ -23,8 +23,9 @@ namespace Tetris
         public static bool slowDownDrawing = false;
         public static ConsoleColor backgroundColor = ConsoleColor.Black;
         public static Byte GRID_END = (Input.Program.MAX_Y - 10) / Block.tileHeight;
-        public static Byte GRID_WIDTH = 20;
-        public static BlockPrototype[] blockPrototypes = { /*
+        public static Byte GRID_WIDTH = 10;
+        public static int score;
+        public static BlockPrototype[] blockPrototypes = {
                 new BlockPrototype(
                         ConsoleColor.Blue,
                         new bool[,]
@@ -35,7 +36,7 @@ namespace Tetris
                             { true, false, false, false }
                         },
                         "I"
-                    ),*/
+                    ),
                 new BlockPrototype(
                         ConsoleColor.Magenta,
                         new bool[,]
@@ -45,7 +46,7 @@ namespace Tetris
                             { true, false, false },
                         },
                         ">"
-                    ),/*
+                    ),
                 new BlockPrototype(
                         ConsoleColor.Green,
                         new bool[,]
@@ -85,7 +86,7 @@ namespace Tetris
                             { true, true },
                         },
                         "O"
-                    )*/
+                    )
             };
 
         public static byte START_X = 5;
@@ -100,7 +101,19 @@ namespace Tetris
         /// 
         /// The grid's outer sides are filled with "true"s.
         /// </summary>
-        private static bool[,] staticGrid;
+        public static bool[,] staticGrid;
+
+        public static byte[] RemoveAt(byte[] source, int index)
+        {
+            byte[] dest = new byte[source.Length - 1];
+            if (index > 0)
+                Array.Copy(source, 0, dest, 0, index);
+
+            if (index < source.Length - 1)
+                Array.Copy(source, index + 1, dest, index, source.Length - index - 1);
+
+            return dest;
+        }
 
 
         /// <summary>
@@ -215,8 +228,6 @@ namespace Tetris
             }
 
             SetUpGrid();
-            Console.WriteLine($"Last index contains: {staticGrid[Programm.GRID_END + 1, 2]}");
-            Thread.Sleep(2000);
 
 
             Console.Clear();
@@ -267,9 +278,19 @@ namespace Tetris
             Console.Clear();
         }
 
+        static void DeleteRow(ref List<ITransform> blocks, int index)
+        {
+            SetUpGrid();
+            Console.Clear();
+            for (int i = 0; i < blocks.Count; i++)
+            {
+                blocks[i].RemoveRow(index);
+            }
+        }
 
         static void ShowGame()
         {
+            score = 0;
             Console.Clear();
 
             Block[] blocks = new Block[0];
@@ -296,10 +317,21 @@ namespace Tetris
                             case TickFinishedAction.CreateNewBlock:
                                 objects.Add(nextBlock);
                                 (nextBlock, currentPrototype) = GenerateBlock(ref blockPool, blockPrototypes, ref rng);
+                                /*DeleteRow(ref objects, GRID_END-2);
+                                DeleteRow(ref objects, GRID_END - 1);
+                                DeleteRow(ref objects, GRID_END);
+                                DeleteRow(ref objects, GRID_END+1);
+                                DeleteRow(ref objects, GRID_END+2);*/
+                                Console.WriteLine("Deleting");
                                 //  continue outerloop;
                                 break;
                             default: break;
                         }
+                    }
+
+                    if (Input.Program.ProcessKey(Input.Program.Input.RemoveLastRow))
+                    {
+                        DeleteRow(ref objects, GRID_END - 2);
                     }
 
                     // (int)(ballX)
@@ -337,6 +369,9 @@ namespace Tetris
                     item.Draw();
                 }
             }
+
+            Console.SetCursorPosition(5, 2);
+            Console.Write($"Score: {score}");
 
 
 
@@ -392,16 +427,50 @@ namespace Tetris
         public Byte[] currentShape;
         public Byte width;
         private float time;
+        public ConsoleColor color;
 
         /// <summary>
         /// If the block is "placed", it can no longer move
         /// </summary>
         public bool placed;
 
+
+        /// <summary>
+        /// Removes the row from the block if it exists.
+        /// </summary>
+        /// <param name="row"></param>
+        public void RemoveRow(int row)
+        {
+            if (!this.placed) return;
+
+            int posInShape = row - this.position.posY;
+            var originalPosition = this.position;
+
+            if (posInShape < 0)
+            {
+                PlaceInGrid(ref Programm.staticGrid);
+                return;
+            }
+
+
+            this.position.posY++;
+
+            if (posInShape >= 0 && posInShape < currentShape.Length)
+            {
+                currentShape[posInShape] = 0x0;
+                List<byte> shapeCopy = currentShape.ToList();
+                shapeCopy.RemoveAt(posInShape);
+                currentShape = shapeCopy.ToArray();
+                Redraw(originalPosition);
+            }
+
+            PlaceInGrid(ref Programm.staticGrid);
+        }
+
         public void Draw()
         {
             Console.SetCursorPosition(position.posX, position.posY);
-            Console.BackgroundColor = prototype.color;
+            Console.BackgroundColor = this.color;
 
             string drawText = "";
 
@@ -410,11 +479,12 @@ namespace Tetris
                 drawText += " ";
             }
 
-            for (int row = 0; row < currentShape.GetLength(0); row++)
+            for (int row = 0; row < currentShape.Length; row++)
             {
-                Byte rowContents = currentShape[row];
+                byte rowContents = currentShape[row];
                 for (int j = 0; j < tileHeight; j++)
                 {
+                    
                     Console.SetCursorPosition(position.posX * Block.tileWidth, (position.posY * Block.tileHeight) + (row * tileHeight) + j);
                     for (int x = 0; x < width; x++)
                     {
@@ -468,8 +538,8 @@ namespace Tetris
         public void Redraw(SpaceInfo originalSpace)
         {
             var newPos = this.position;
-            var colour = this.prototype.color;
-            this.prototype.color = Programm.backgroundColor;
+            var colour = this.color;
+            this.color = Programm.backgroundColor;
             this.position = originalSpace;
 
             if (this.position.rotation != newPos.rotation)
@@ -484,7 +554,7 @@ namespace Tetris
 
             // Redraw in new position
             this.position = newPos;
-            this.prototype.color = colour;
+            this.color = colour;
 
             if (this.position.rotation != originalSpace.rotation)
             {
@@ -596,7 +666,9 @@ namespace Tetris
                 int lowerEdgePosPhysical = lowerEdgePos * Block.tileHeight;
                 if (InterferesWithGrid(grid)/*lowerEdgePosPhysical>=Programm.GRID_END*/)
                 {
+                    Tetris.Programm.score++;
                     this.placed = true;
+                    this.prototype = null;
                     this.position.posY--;
                     this.PlaceInGrid(ref grid);
                     Array.Resize(ref requiredActions, requiredActions.Length + 1);
@@ -729,6 +801,7 @@ namespace Tetris
             this.currentShape = new Byte[prototype.shape.GetLength(0)];
             this.placed = false;
             this.time = 0;
+            this.color = prototype.color;
 
             for (int i = 0; i < this.currentShape.GetLength(0); i++)
             {
@@ -749,6 +822,7 @@ namespace Tetris
             }
         }
     }
+
 
     public struct SpaceInfo
     {
@@ -783,7 +857,8 @@ namespace Tetris
         void Tick(float deltaTime, ref TickFinishedAction[] requiredActions, ref bool[,] grid);
 
         bool CanEverTick();
-        
+
+        void RemoveRow(int index);
     }
 }
 
@@ -871,6 +946,7 @@ namespace Input
              RotateDown,
              Select,
              Exit,
+             RemoveLastRow,
         }
 
         private static Input? KeyToInput(ConsoleKey key)
@@ -889,6 +965,8 @@ namespace Input
                     return Input.Select;
                 case ConsoleKey.Escape:
                     return Input.Exit;
+                case ConsoleKey.L:
+                    return Input.RemoveLastRow;
                 default:
                     return null;
             }
@@ -954,6 +1032,8 @@ namespace Input
             Console.ForegroundColor = ConsoleColor.White;
             Console.WriteLine("Menü (Abbruch mit 'esc')");
 
+            Console.SetCursorPosition(0, MAX_Y - 1);
+            Console.Write("-----------------");
 
             int longestEntry = 0;
 
@@ -978,6 +1058,8 @@ namespace Input
             {
                 if (ProcessKey(Input.RotateUp))
                 {
+                    Console.SetCursorPosition(0, MAX_Y - 1);
+                    Console.Write("-----------------");
                     if (selectedEntry > 0)
                     {
                         selectedEntry--;
@@ -986,6 +1068,8 @@ namespace Input
 
                 if (ProcessKey(Input.RotateDown))
                 {
+                    Console.SetCursorPosition(0, MAX_Y - 1);
+                    Console.Write("-----------------");
                     if (selectedEntry < options.Length - 1)
                     {
                         selectedEntry++;
@@ -996,6 +1080,8 @@ namespace Input
                 {
                     return;
                 }
+
+
 
                 
                 for (int i = 0; i < options.Length; i++)
