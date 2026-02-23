@@ -12,6 +12,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Tetris;
+using System.Text.RegularExpressions;
 
 namespace Tetris
 {
@@ -95,6 +96,7 @@ namespace Tetris
         public static byte NEXT_POS_Y = 5;
         public static bool SKIP_TITLE = true;
         public static float block_speed = 1f;
+        public static string PLAYER_NAME = "Player 1";
         /// <summary>
         /// The grid that is "set in stone", meaning it doesn't include 
         /// blocks whilst they are still moving.
@@ -240,8 +242,8 @@ namespace Tetris
                 ShowTitle();
             }
 
+            RequestPlayerName();
 
-            
 
             string[] options = new string[] { "Start Game", "Leaderboard", "Settings", "Quit", "Manual"};
             int selectedOption = 0;
@@ -341,16 +343,20 @@ namespace Tetris
                                 }
 
                                 break;
+
+                            case TickFinishedAction.Died:
+                                Console.Clear();
+                                score = 0;
+                                block_speed = 1f;
+                                return;
                             default: break;
                         }
                     }
 
                     if (Input.Program.ProcessKey(Input.Program.Input.RemoveLastRow))
                     {
-                        DeleteRow(ref objects, GRID_END - 2);
+                        DeleteRow(ref objects, GRID_END - 1);
                     }
-
-                    // (int)(ballX)
 
 
                     Thread.Sleep(10);
@@ -363,6 +369,33 @@ namespace Tetris
             }
 
             Input.Program.currentInputs.Clear();
+
+            Console.Clear();
+        }
+
+
+        static void RequestPlayerName()
+        {
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.SetCursorPosition(20, 10);
+            Console.Write("Player name: ___________");
+            Console.SetCursorPosition(33, 10);
+
+            Console.CursorVisible = true;
+            PLAYER_NAME = Console.ReadLine();
+            Console.CursorVisible = false;
+
+            // Check name 
+            Regex regex = new Regex(@"[a-zA-Z^(nN)][a-zA-Z0-9]*");
+
+            if (!regex.IsMatch(PLAYER_NAME))
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.SetCursorPosition(20, 11);
+                Console.WriteLine("Expression must match this regex pattern: '[a-zA-Z0-9^(nN)][a-zA-Z0-9]*'.");
+                Console.ForegroundColor = ConsoleColor.Red;
+                RequestPlayerName();
+            }
 
             Console.Clear();
         }
@@ -419,6 +452,7 @@ namespace Tetris
     public enum TickFinishedAction
     {
         CreateNewBlock,
+        Died,
     }
 
     public class BlockPrototype
@@ -582,7 +616,13 @@ namespace Tetris
             this.Draw();
         }
 
-        private void PlaceInGrid(ref bool[,] currentGrid)
+        /// <summary>
+        /// Updates the given grid to match the blocks current form.
+        /// This also returns whether the block overlaps with any other blocks, in which case true is returned, false will be returned otherwise.
+        /// </summary>
+        /// <param name="currentGrid"></param>
+        /// <returns></returns>
+        private bool PlaceInGrid(ref bool[,] currentGrid)
         {
             for (int row = 0; row < currentShape.GetLength(0); row++)
             {
@@ -594,7 +634,7 @@ namespace Tetris
 
                     if (filled & filledBefore)
                     {
-                        Tetris.Programm.block_speed = float.MaxValue;
+                        return true;
                     }
 
                     if (filled)
@@ -604,6 +644,8 @@ namespace Tetris
 
                 }
             }
+
+            return false;
         }
 
 
@@ -708,7 +750,11 @@ namespace Tetris
                     this.placed = true;
                     this.prototype = null;
                     this.position.posY--;
-                    this.PlaceInGrid(ref grid);
+                    if (this.PlaceInGrid(ref grid))
+                    {
+                        Array.Resize(ref requiredActions, requiredActions.Length + 1);
+                        requiredActions[requiredActions.Length - 1] = TickFinishedAction.Died;
+                    }
                     Array.Resize(ref requiredActions, requiredActions.Length + 1);
                     requiredActions[requiredActions.Length - 1] = TickFinishedAction.CreateNewBlock;
                 }
@@ -1070,8 +1116,6 @@ namespace Input
             Console.ForegroundColor = ConsoleColor.White;
             Console.WriteLine("Menü (Abbruch mit 'esc')");
 
-            Console.SetCursorPosition(0, MAX_Y - 1);
-            Console.Write("-----------------");
 
             int longestEntry = 0;
 
