@@ -189,6 +189,11 @@ namespace Tetris
                     ),
 
         };
+        public static ISetting[] settings =
+        {
+            new NameSetting(),
+            new NameSetting(),
+        };
 
         /// <summary>
         /// Builds the grid's outer sides as described.
@@ -249,6 +254,9 @@ namespace Tetris
                         break;
                     case 1:
                         ShowLeaderboard();
+                        break;
+                    case 2:
+                        ShowSettings();
                         break;
                     case 3:
                         ShowManual();
@@ -370,7 +378,7 @@ namespace Tetris
                         case TickFinishedAction.Died:
                             // Store the score if necessary
                             Input.Program.gameData.RegisterScore(playerName, score);
-
+                            Console.Clear();
                             CleanUpGame();
 
                             return;
@@ -400,7 +408,6 @@ namespace Tetris
         }
 
 
-
         /// <summary>
         /// Removes static rests of the game.
         /// This does not register the score.
@@ -414,13 +421,77 @@ namespace Tetris
             Input.Program.currentInputs.Clear();
         }
 
+        /// <summary>
+        /// Draws a single frame and gives back actions that the method
+        /// can't handle by itself.
+        /// </summary>
+        /// <param name="startTime">The start time of the last frame. Frame 0 requires the current time, all other ones require references to the same variable.</param>
+        /// <param name="grid">Should be the static grid usually (always).</param>
+        /// <returns></returns>
+        static TickFinishedAction[] DrawFrame(ref DateTime startTime, ref bool[,] grid)
+        {
+            TickFinishedAction[] requiredActions = new TickFinishedAction[0] { };
+
+            float deltaTime = (float)(DateTime.Now - startTime).TotalSeconds;
+            startTime = DateTime.Now;
+
+            Console.SetCursorPosition(0, 1);
+            Console.Write($"FPS: {(int)(1 / deltaTime)}; Speed: {block_speed}, Score: {score}");
+
+            if (objects != null)
+            {
+
+                foreach (var item in objects)
+                {
+                    if (item.CanEverTick())
+                    {
+                        item.Tick(deltaTime, ref requiredActions, ref grid);
+                    }
+
+                    item.Draw();
+                }
+            }
+
+
+            return requiredActions;
+
+        }
+
+
+        /// <summary>
+        /// Generates a new block in the way Tetris originally did.
+        /// There's a block pool which contains all of the blocks in the beginning.
+        /// One block is taken from the pool at random.
+        /// Once there are no blocks left, the pool resets.
+        /// </summary>
+        /// <param name="pool"></param>
+        /// <param name="allBlocks"></param>
+        /// <param name="rng"></param>
+        /// <returns></returns>
+        static (Block, BlockPrototype) GenerateBlock(ref List<BlockPrototype> pool, BlockPrototype[] allBlocks, ref Random rng)
+        {
+            if (pool.Count == 0)
+            {
+                pool = allBlocks.ToList();
+            }
+
+
+            int index = rng.Next(0, pool.Count);
+
+            BlockPrototype prototype = pool[index];
+            pool.RemoveAt(index);
+
+            var block = new Block(prototype, START_X, START_Y);
+
+            return (block, prototype);
+        }
 
         /// <summary>
         /// Shows a screen to the player asking the player
         /// to enter their name and stores the result to the PLAYER_NAME
         /// variable if OK.
         /// </summary>
-        static void RequestPlayerName()
+        public static void RequestPlayerName()
         {
             Console.ForegroundColor = ConsoleColor.White;
             Console.SetCursorPosition(20, 10);
@@ -579,70 +650,91 @@ namespace Tetris
             Console.BackgroundColor = Program.BACKGROUND_COLOR;
         }
 
-
-        /// <summary>
-        /// Draws a single frame and gives back actions that the method
-        /// can't handle by itself.
-        /// </summary>
-        /// <param name="startTime">The start time of the last frame. Frame 0 requires the current time, all other ones require references to the same variable.</param>
-        /// <param name="grid">Should be the static grid usually (always).</param>
-        /// <returns></returns>
-        static TickFinishedAction[] DrawFrame(ref DateTime startTime, ref bool[,] grid)
+        static void ShowSettings()
         {
-            TickFinishedAction[] requiredActions = new TickFinishedAction[0] { };
+            Console.Clear();
+            Console.ForegroundColor = ConsoleColor.White;
 
-            float deltaTime = (float)(DateTime.Now - startTime).TotalSeconds;
-            startTime = DateTime.Now;
-
-            Console.SetCursorPosition(0, 1);
-            Console.Write($"FPS: {(int)(1 / deltaTime)}; Speed: {block_speed}, Score: {score}");
-
-            if (objects != null)
+            int selectedEntry = 0;
+            int rowLength = 20 + 2 * 8 + 10;
+            string emptyRowString = "";
+            for (int i = 0; i < rowLength+2; i++)
             {
+                emptyRowString += ' ';
+            }
 
-                foreach (var item in objects)
+            while (true)
+            {
+                for (int i = 0; i < settings.Length; i++)
                 {
-                    if (item.CanEverTick())
+                    ISetting setting = settings[i];
+                    Console.BackgroundColor = i == selectedEntry ? ConsoleColor.Blue : Program.BACKGROUND_COLOR;
+                    Console.SetCursorPosition(10, 5 + i);
+                    Console.Write(emptyRowString);
+                    Console.SetCursorPosition(10, 5 + i);
+                    Console.Write($"{setting.GetName(),20}\t\t{setting.GetValue(),10}");
+                }
+
+                while (true)
+                {
+                    if (Input.Program.ProcessKey(Input.Program.Input.Down))
                     {
-                        item.Tick(deltaTime, ref requiredActions, ref grid);
+                        if (selectedEntry < settings.Length - 1) selectedEntry++;
+                        break;
                     }
 
-                    item.Draw();
+                    if (Input.Program.ProcessKey(Input.Program.Input.RotateUp))
+                    {
+                        if (selectedEntry > 0) selectedEntry--;
+                        break;
+                    }
+
+                    if (Input.Program.ProcessKey(Input.Program.Input.Select))
+                    {
+                        Console.Clear();
+                        settings[selectedEntry].Select();
+                        Console.Clear();
+                        break;
+                    }
+
+                    if (Input.Program.ProcessKey(Input.Program.Input.Exit))
+                    {
+                        Console.Clear();
+                        return;
+                    }
                 }
             }
+        }
+    }
 
+    public interface ISetting
+    {
+        string GetName();
+        string GetValue();
+        string GetDescription();
+        void Select();
+    }
 
-            return requiredActions;
-
+    public class NameSetting: ISetting
+    {
+        public string GetName()
+        {
+            return "Current Player";
         }
 
-
-        /// <summary>
-        /// Generates a new block in the way Tetris originally did.
-        /// There's a block pool which contains all of the blocks in the beginning.
-        /// One block is taken from the pool at random.
-        /// Once there are no blocks left, the pool resets.
-        /// </summary>
-        /// <param name="pool"></param>
-        /// <param name="allBlocks"></param>
-        /// <param name="rng"></param>
-        /// <returns></returns>
-        static (Block, BlockPrototype) GenerateBlock(ref List<BlockPrototype> pool, BlockPrototype[] allBlocks, ref Random rng)
+        public string GetValue()
         {
-            if (pool.Count == 0)
-            {
-                pool = allBlocks.ToList();
-            }
+            return Program.playerName;
+        }
 
+        public string GetDescription()
+        {
+            return "The name of the player who's currently playing the game. Required for the leaderboard.";
+        }
 
-            int index = rng.Next(0, pool.Count);
-
-            BlockPrototype prototype = pool[index];
-            pool.RemoveAt(index);
-
-            var block = new Block(prototype, START_X, START_Y);
-
-            return (block, prototype);
+        public void Select()
+        {
+            Program.RequestPlayerName();
         }
     }
 
