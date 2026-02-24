@@ -1,9 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using System.Threading;
+using Input;
 using Tetris;
 
 namespace Tetris
@@ -15,7 +20,7 @@ namespace Tetris
         private static List<ITransform> objects = new List<ITransform>();
         public static bool slowDownDrawing = false;
         public static ConsoleColor backgroundColor = ConsoleColor.Black;
-        public static Byte GRID_END = (Input.Program.MAX_Y - 10) / Block.tileHeight;
+        public static Byte GRID_END = 24;//(Input.Program.MAX_Y - 10) / Block.tileHeight;
         public static Byte GRID_WIDTH = 10;
         public static int score;
         public static BlockPrototype[] blockPrototypes = {
@@ -227,6 +232,8 @@ namespace Tetris
                 ShowTitle();
             }
 
+            Input.Program.LoadGameData();
+
             RequestPlayerName();
 
 
@@ -245,10 +252,15 @@ namespace Tetris
                         SetUpGrid();
                         ShowGame();
                         break;
-
+                    case 1:
+                        ShowLeaderboard();
+                        break;
                     case 3:
                         ShowManual();
                         break;
+                    case 4:
+                        Input.Program.StoreGameData();
+                        return;
                     default: break;
                 }
             }
@@ -265,13 +277,18 @@ namespace Tetris
                 Console.Write(manual[i]);
             }
 
-            
+
+            WaitForExit();
+
+            Console.Clear();
+        }
+
+        static void WaitForExit()
+        {
             while (!Input.Program.ProcessKey(Input.Program.Input.Exit))
             {
                 Thread.Sleep(16);
             }
-
-            Console.Clear();
         }
 
         public static void ShowTitle()
@@ -356,8 +373,14 @@ namespace Tetris
 
                             case TickFinishedAction.Died:
                                 Console.Clear();
+
+                                // Store the score if necessary
+                                Input.Program.gameData.RegisterScore(PLAYER_NAME, score);
+
+                                // Reset the game state
                                 score = 0;
                                 block_speed = 1f;
+
                                 return;
                             default: break;
                         }
@@ -396,19 +419,143 @@ namespace Tetris
             Console.CursorVisible = false;
 
             // Check name 
-            Regex regex = new Regex(@"[a-zA-Z^(nN)][a-zA-Z0-9]*");
+            Regex regex = new Regex(@"[a-zA-Z][a-zA-Z0-9]*");
 
             if (!regex.IsMatch(PLAYER_NAME))
             {
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.SetCursorPosition(20, 11);
-                Console.WriteLine("Expression must match this regex pattern: '[(a-zA-Z)^(nN)][a-zA-Z0-9]*'.");
+                Console.WriteLine("Expression must match this regex pattern: '[a-zA-Z][a-zA-Z0-9]*'.");
                 Console.ForegroundColor = ConsoleColor.Red;
                 RequestPlayerName();
             }
 
             Console.Clear();
         }
+
+
+        static void ShowLeaderboard()
+        {
+            List<Score> bestScores = new List<Score>();
+
+            foreach (Score pScore in Input.Program.gameData.highscores)
+            {
+                bool foundPair = false;
+
+                for (int i = 0; i < bestScores.Count; i++)
+                {
+                    if (bestScores[i].value < pScore.value)
+                    {
+                        foundPair = true;
+                        bestScores.Insert(i, pScore);
+                        break;
+                    }
+                }
+
+                if (!foundPair)
+                {
+                    bestScores.Add(pScore);
+                }
+            }
+
+            int page = 0;
+
+            DrawLeaderboard(page*10, 10, bestScores);
+
+            while (!Input.Program.ProcessKey(Input.Program.Input.Exit))
+            {
+                if (Input.Program.ProcessKey(Input.Program.Input.Left))
+                {
+                    if (page > 0) DrawLeaderboard(--page*10, 10, bestScores);
+                }
+
+                if (Input.Program.ProcessKey(Input.Program.Input.Right))
+                {
+                    if (page < bestScores.Count / 10) DrawLeaderboard(++page*10, 10, bestScores);
+                }
+
+                Thread.Sleep(16);
+            }
+
+            Console.Clear();
+        }
+
+        static void DrawLeaderboard(int startIndex, int length, List<Score> scoresSorted)
+        {
+            Console.Clear();
+
+            int rowLength = 3 + 12 + 5 + 2 * 4;
+            string emptyRowString = "";
+
+            int center = 10 + rowLength / 2;
+
+            var lastIndex = startIndex + length;
+
+            if (lastIndex > scoresSorted.Count) lastIndex = scoresSorted.Count;
+
+            string title = $"Leaderboard ({startIndex+1}...{lastIndex} from {scoresSorted.Count})";
+
+            Console.SetCursorPosition(center - title.Length / 2, 5);    // Center the text above the board
+            Console.Write(title);
+
+
+
+            for (int i = 0; i < rowLength; i++)
+            {
+                emptyRowString += ' ';
+            }
+
+            for (int i = startIndex; i < startIndex + length && i < scoresSorted.Count; i++)
+            {
+                Score item = scoresSorted[i];
+
+                switch (i)
+                {
+                    case 0:
+                        Console.BackgroundColor = ConsoleColor.DarkYellow;  // Gold?
+                        goto BLACK;
+                    case 1:
+                        Console.BackgroundColor = ConsoleColor.Gray;        // Silver?
+                        goto BLACK;
+                    case 2:
+                        Console.BackgroundColor = ConsoleColor.DarkGray;    // K.A.?
+                        goto BLACK;
+                    default:
+                        Console.ForegroundColor = ConsoleColor.White;
+                        Console.BackgroundColor = Program.backgroundColor;
+                        break;
+                    BLACK:
+                        Console.ForegroundColor = ConsoleColor.Black;
+                        break;
+                }
+
+                if (item.playerName == PLAYER_NAME)
+                {
+                    // Highlight the current user
+                    Console.BackgroundColor = ConsoleColor.Red;
+                }
+
+                var posY = 10 + i - startIndex;
+                Console.SetCursorPosition(10, posY);
+                Console.Write(emptyRowString);      // For the background
+                Console.SetCursorPosition(10, posY);
+                Console.Write($"{i+1,3}.\t{item.playerName,12}\t{item.value,5}");
+            }
+
+            Console.SetCursorPosition(10, 12+length-startIndex);
+            Console.BackgroundColor = startIndex == 0 ? Program.backgroundColor : ConsoleColor.White;
+            Console.ForegroundColor = startIndex == 0 ? ConsoleColor.White : Program.backgroundColor;
+            Console.Write("Previous");
+            Console.SetCursorPosition(10+rowLength-4, 12 + length - startIndex);
+            var listEnded = startIndex + length > scoresSorted.Count;
+            Console.BackgroundColor = listEnded ? Program.backgroundColor : ConsoleColor.White;
+            Console.ForegroundColor = listEnded ? ConsoleColor.White : Program.backgroundColor;
+            Console.Write("Next");
+
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.BackgroundColor = Program.backgroundColor;
+        }
+        
 
         static TickFinishedAction[] DrawFrame(ref DateTime startTime, ref bool[,] grid)
         {
@@ -655,6 +802,7 @@ namespace Tetris
 
                     if (filledBefore)
                     {
+                        
                         return true;
                     }
                     
@@ -764,7 +912,7 @@ namespace Tetris
                 if (InterferesWithGrid(grid)/*lowerEdgePosPhysical>=Programm.GRID_END*/)
                 {
                     Tetris.Program.score++;
-                    Tetris.Program.block_speed *= 0.98f;
+                    Tetris.Program.block_speed *= 0.99f;
                     this.placed = true;
                     this.prototype = null;
                     this.position.posY--;
@@ -973,7 +1121,10 @@ namespace Input
 
 
         public const int MAX_X = 150;
-        public const int MAX_Y = 100;
+        public const int MAX_Y = 55;
+
+        public static GameData gameData;
+
         static void Eingabe()
         {
             ConsoleKeyInfo ein;
@@ -995,6 +1146,27 @@ namespace Input
                     currentInputs.Add(input.Value);
                 }
             }
+        }
+
+        public static void LoadGameData()
+        {
+            if (File.Exists("game_data.json"))
+            {
+                string jsonString = File.ReadAllText("game_data.json");
+                gameData = JsonSerializer.Deserialize<GameData>(jsonString);
+            } else
+            {
+                gameData = GameData.GetNew();
+            }
+        }
+
+        public static void StoreGameData()
+        {
+            string jsonString = JsonSerializer.Serialize(gameData);
+            Console.WriteLine("Storing: " + jsonString);
+            Console.WriteLine("Meaning #scores: " + gameData.highscores.Count);
+
+            File.WriteAllText("game_data.json", jsonString);
         }
 
         public enum Input
@@ -1152,6 +1324,62 @@ namespace Input
 
             System.Environment.Exit(0);
 
+        }
+    }
+
+    public class GameData
+    {
+        [JsonPropertyName("highscores")]
+        public List<Score> highscores { get; set; }
+
+
+        /// <summary>
+        /// Sets the new highscore for a player if it is that player's best.
+        /// </summary>
+        /// <param name="player">The player to asign the score to</param>
+        /// <param name="score">The score that player reached</param>
+        public void RegisterScore(string player, int score)
+        {
+            if (highscores == null)
+            {
+                highscores = new List<Score>();
+            }
+
+            for (int i = 0; i < highscores.Count; i++)
+            {
+                Score playerScore = highscores[i];
+
+                if (playerScore.playerName != player) continue;
+                if (playerScore.value > score) return;
+
+                highscores[i].value = score;
+                return;
+            }
+
+            highscores.Add(new Score(player, score));
+        }
+
+        public static GameData GetNew()
+        {
+            GameData data = new GameData();
+            data.highscores = new List<Score>();
+
+            return data;
+        }
+}
+
+    public class Score
+    {
+        [JsonPropertyName("player_name")]
+        public string playerName { get; set; }
+        [JsonPropertyName("value")]
+        public int value { get; set; }
+
+
+        public Score(string playerName, int value)
+        {
+            this.playerName = playerName;
+            this.value = value;
         }
     }
 }
