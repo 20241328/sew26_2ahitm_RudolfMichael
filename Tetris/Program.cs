@@ -13,16 +13,26 @@ using Tetris;
 
 namespace Tetris
 {
-
-
     internal class Program
     {
-        private static List<ITransform> objects = new List<ITransform>();
-        public static bool slowDownDrawing = false;
-        public static ConsoleColor backgroundColor = ConsoleColor.Black;
-        public static Byte GRID_END = 24;//(Input.Program.MAX_Y - 10) / Block.tileHeight;
-        public static Byte GRID_WIDTH = 10;
+        /// <summary>
+        /// The factor with which blocks take shorter to move automatically
+        /// after a block has been placed.
+        /// </summary>
+        public const float BLOCK_SPEED_INCREASE = 0.99f;
+        public const ConsoleColor BACKGROUND_COLOR = ConsoleColor.Black;
+        public const byte GRID_END = 24;
+        public const byte GRID_WIDTH = 10;
+        public const byte NEXT_POS_Y = 5;
+        public const byte NEXT_POS_X = 20;
+        public const byte START_Y = 5;
+        public const bool SKIP_TITLE = true;
+        public const byte START_X = 5;
+        public const int MAX_PLAYER_NAME_LENGTH = 15;
+        
+
         public static int score;
+        public static string playerName = "Player 1";
         public static BlockPrototype[] blockPrototypes = {
                 new BlockPrototype(
                         ConsoleColor.Blue,
@@ -32,8 +42,7 @@ namespace Tetris
                             { true, false, false, false },
                             { true, false, false, false },
                             { true, false, false, false }
-                        },
-                        "I"
+                        }
                     ),
                 new BlockPrototype(
                         ConsoleColor.Magenta,
@@ -42,8 +51,7 @@ namespace Tetris
                             { true, false, false },
                             { true, true, false },
                             { true, false, false },
-                        },
-                        ">"
+                        }
                     ),
                 new BlockPrototype(
                         ConsoleColor.Green,
@@ -52,8 +60,7 @@ namespace Tetris
                             { true, false, false },
                             { true, true, false },
                             { false, true, false },
-                        },
-                        "Z"
+                        }
                     ),
                  new BlockPrototype(
                         ConsoleColor.Red,
@@ -62,8 +69,7 @@ namespace Tetris
                             { false, true, false },
                             { true, true, false },
                             { true, false, false },
-                        },
-                        "S"
+                        }
                     ),
                   new BlockPrototype(
                         ConsoleColor.DarkYellow,
@@ -73,8 +79,7 @@ namespace Tetris
                             { true, false, false, false },
                             { false, false, false, false },
                             { false, false, false, false }
-                        },
-                        "L"
+                        }
                     ),
                    new BlockPrototype(
                         ConsoleColor.Yellow,
@@ -82,29 +87,28 @@ namespace Tetris
                         {
                             { true, true },
                             { true, true },
-                        },
-                        "O"
+                        }
                     )
             };
+        private static List<IGameObject> objects = new List<IGameObject>();
+        public static float block_speed = 1f;
+        public static bool slowDownDrawing = false;
+
+
+        private static string[] options = new string[] { "Start Game", "Leaderboard", "Settings", "Manual", "Quit",  };
+        
+       
 
         private static string[] manual = new string[]
         {
             "Use the arrow keys to move and rotate the blocks.",
             "For every block that lands, your score is increased.",
             "The goal is to fill the rows leaving no gaps, as that makes them disappear.",
+            "As you progress, the game gets harder because the blocks fall faster.",
             "Eventually, the blocks will reach the top, ending the game.",
             "Escape returns to the menu.",
-            
-        };
-        private static string[] options = new string[] { "Start Game", "Leaderboard", "Settings", "Manual", "Quit",  };
 
-        public static byte START_X = 5;
-        public static byte START_Y = 5;
-        public static byte NEXT_POS_X = 20;
-        public static byte NEXT_POS_Y = 5;
-        public static bool SKIP_TITLE = true;
-        public static float block_speed = 1f;
-        public static string PLAYER_NAME = "Player 1";
+        };
 
         /// <summary>
         /// The grid that is "set in stone", meaning it doesn't include 
@@ -126,8 +130,7 @@ namespace Tetris
                             { false, false, true, false, false },
                             { false, false, true, false, false },
                             { false,false, true, false, false },
-                        },
-                        "T0"
+                        }
                     ),
                 new BlockPrototype(
                         ConsoleColor.Red,
@@ -138,8 +141,7 @@ namespace Tetris
                             { true, true, true, true, true },
                             { true, false, false, false, false },
                             { true, true, true, true, true },
-                        },
-                        "E"
+                        }
                     ),
 
                 new BlockPrototype(
@@ -151,8 +153,7 @@ namespace Tetris
                             { false, false, true, false, false },
                             { false, false, true, false, false },
                             { false,false, true, false, false },
-                        },
-                        "T1"
+                        }
                     ),
 
                 new BlockPrototype(
@@ -164,8 +165,7 @@ namespace Tetris
                             { true, true, true, true },
                             { true, false, true, false, },
                             { true,false, false, true,  },
-                        },
-                        "R"
+                        }
                     ),
                  new BlockPrototype(
                         ConsoleColor.Cyan,
@@ -176,8 +176,7 @@ namespace Tetris
                             { true, },
                             { true, },
                             { true,  },
-                        },
-                        "I"
+                        }
                     ),
                   new BlockPrototype(
                         ConsoleColor.Magenta,
@@ -188,8 +187,7 @@ namespace Tetris
                             { true, true, true, true, },
                             { false, false, false, true, },
                             { true, true, true, true, },
-                        },
-                        "S"
+                        }
                     ),
 
         };
@@ -239,8 +237,6 @@ namespace Tetris
 
             
             int selectedOption = 0;
-           
-            
 
             while (!Input.Program.currentInputs.Contains(Input.Program.Input.Exit))
             {
@@ -251,6 +247,7 @@ namespace Tetris
                     case 0:
                         SetUpGrid();
                         ShowGame();
+                        Input.Program.StoreGameData();
                         break;
                     case 1:
                         ShowLeaderboard();
@@ -307,7 +304,7 @@ namespace Tetris
             Console.Clear();
         }
 
-        static void DeleteRow(ref List<ITransform> blocks, int index)
+        static void DeleteRow(ref List<IGameObject> blocks, int index)
         {
             SetUpGrid();
             Console.Clear();
@@ -328,7 +325,7 @@ namespace Tetris
 
             (Block nextBlock, BlockPrototype currentPrototype) = GenerateBlock(ref blockPool, blockPrototypes, ref rng);
 
-            ITransform[] existingTransforms = new ITransform[0];
+            IGameObject[] existingTransforms = new IGameObject[0];
 
             DateTime time = DateTime.Now;
 
@@ -339,75 +336,97 @@ namespace Tetris
 
              for (int i = 0; i < 10000; i++)
                 {
-                    foreach (TickFinishedAction action in DrawFrame(ref time, ref staticGrid))
+                foreach (TickFinishedAction action in DrawFrame(ref time, ref staticGrid))
+                {
+                    switch (action)
                     {
-                        switch (action)
-                        {
-                            case TickFinishedAction.CreateNewBlock:
-                                objects.Add(nextBlock);
-                                (nextBlock, currentPrototype) = GenerateBlock(ref blockPool, blockPrototypes, ref rng);
+                        case TickFinishedAction.CreateNewBlock:
+                            objects.Add(nextBlock);
+                            (nextBlock, currentPrototype) = GenerateBlock(ref blockPool, blockPrototypes, ref rng);
 
-                                // A block has been placed, so it needs to be checked if any rows are full
-                                for (int row = 0; row < staticGrid.GetLength(0)-2; row++)
+                            // A block has been placed, so it needs to be checked if any rows are full
+                            for (int row = 0; row < staticGrid.GetLength(0) - 2; row++)
+                            {
+                                // This algorithm seems painfuly inefficient, and it is, but
+                                // for some reason, nothing else seems to work.
+                                // TODO: Clean this mess up
+                                int fulls = 0;
+                                for (int col = 0; col < staticGrid.GetLength(1); col++)
                                 {
-                                    int fulls = 0;
-                                    for (int col = 0; col < staticGrid.GetLength(1); col++)
+                                    if (staticGrid[row, col])
                                     {
-                                        if (staticGrid[row, col])
-                                        {
-                                            fulls++;
-                                        }
-                                    }
-
-
-                                    bool fullRow = fulls == staticGrid.GetLength(1);
-                                    
-
-                                    if (fullRow)
-                                    {
-                                        DeleteRow(ref objects, row);
+                                        fulls++;
                                     }
                                 }
 
-                                break;
 
-                            case TickFinishedAction.Died:
-                                Console.Clear();
+                                bool fullRow = fulls == staticGrid.GetLength(1);
 
-                                // Store the score if necessary
-                                Input.Program.gameData.RegisterScore(PLAYER_NAME, score);
 
-                                // Reset the game state
-                                score = 0;
-                                block_speed = 1f;
+                                if (fullRow)
+                                {
+                                    DeleteRow(ref objects, row);
+                                }
+                            }
 
-                                return;
-                            default: break;
-                        }
+                            break;
+
+                        case TickFinishedAction.Died:
+                            // Store the score if necessary
+                            Input.Program.gameData.RegisterScore(playerName, score);
+
+                            CleanUpGame();
+
+                            return;
+                        default: break;
                     }
+                }
 
-                    if (Input.Program.ProcessKey(Input.Program.Input.RemoveLastRow))
-                    {
-                        DeleteRow(ref objects, GRID_END - 1);
-                    }
+
+                // This exists for debug purposes only, 
+                // but the intent should be clear and this makes for a great
+                // way to cheat.
+                if (Input.Program.ProcessKey(Input.Program.Input.RemoveLastRow))
+                {
+                    DeleteRow(ref objects, GRID_END - 1);
+                }
 
 
                     Thread.Sleep(10);
                 }
 
-                
+
                 Thread.Sleep(1000);
-                objects = new List<ITransform>();
+                objects = new List<IGameObject>();
                 Console.Clear();
             }
-
             Input.Program.currentInputs.Clear();
 
-            Console.Clear();
         }
 
 
-        static void RequestPlayerName()
+
+
+
+            /// <summary>
+            /// Removes static rests of the game.
+            /// This does not register the score.
+            /// </summary>
+            static void CleanUpGame()
+            {
+                // Reset the game state
+                score = 0;
+                block_speed = 1f;
+                objects = new List<IGameObject>();
+            }
+
+
+            /// <summary>
+            /// Shows a screen to the player asking the player
+            /// to enter their name and stores the result to the PLAYER_NAME
+            /// variable if OK.
+            /// </summary>
+            static void RequestPlayerName()
         {
             Console.ForegroundColor = ConsoleColor.White;
             Console.SetCursorPosition(20, 10);
@@ -415,17 +434,27 @@ namespace Tetris
             Console.SetCursorPosition(33, 10);
 
             Console.CursorVisible = true;
-            PLAYER_NAME = Console.ReadLine();
+            playerName = Console.ReadLine();
             Console.CursorVisible = false;
 
             // Check name 
             Regex regex = new Regex(@"[a-zA-Z][a-zA-Z0-9]*");
 
-            if (!regex.IsMatch(PLAYER_NAME))
+            if (!regex.IsMatch(playerName))
             {
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.SetCursorPosition(20, 11);
                 Console.WriteLine("Expression must match this regex pattern: '[a-zA-Z][a-zA-Z0-9]*'.");
+                Console.ForegroundColor = ConsoleColor.Red;
+                RequestPlayerName();        // Maybe the recursion should be avoided here but I couldn't be bothered less to be honest.
+                                            // Nobody is realistically gonna spam enter.
+            }
+
+            if (playerName.Length > MAX_PLAYER_NAME_LENGTH)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.SetCursorPosition(20, 11);
+                Console.WriteLine($"This name is too long (maximum: {MAX_PLAYER_NAME_LENGTH}, actual: {playerName.Length}).");
                 Console.ForegroundColor = ConsoleColor.Red;
                 RequestPlayerName();
             }
@@ -484,7 +513,7 @@ namespace Tetris
         {
             Console.Clear();
 
-            int rowLength = 3 + 12 + 5 + 2 * 4;
+            int rowLength = 3 + MAX_PLAYER_NAME_LENGTH + 5 + 2 * 4;
             string emptyRowString = "";
 
             int center = 10 + rowLength / 2;
@@ -522,14 +551,14 @@ namespace Tetris
                         goto BLACK;
                     default:
                         Console.ForegroundColor = ConsoleColor.White;
-                        Console.BackgroundColor = Program.backgroundColor;
+                        Console.BackgroundColor = Program.BACKGROUND_COLOR;
                         break;
                     BLACK:
                         Console.ForegroundColor = ConsoleColor.Black;
                         break;
                 }
 
-                if (item.playerName == PLAYER_NAME)
+                if (item.playerName == playerName)
                 {
                     // Highlight the current user
                     Console.BackgroundColor = ConsoleColor.Red;
@@ -539,24 +568,31 @@ namespace Tetris
                 Console.SetCursorPosition(10, posY);
                 Console.Write(emptyRowString);      // For the background
                 Console.SetCursorPosition(10, posY);
-                Console.Write($"{i+1,3}.\t{item.playerName,12}\t{item.value,5}");
+                Console.Write($"{i+1,3}.\t{item.playerName,MAX_PLAYER_NAME_LENGTH}\t{item.value,5}");
             }
 
-            Console.SetCursorPosition(10, 12+length-startIndex);
-            Console.BackgroundColor = startIndex == 0 ? Program.backgroundColor : ConsoleColor.White;
-            Console.ForegroundColor = startIndex == 0 ? ConsoleColor.White : Program.backgroundColor;
+            Console.SetCursorPosition(10, MAX_PLAYER_NAME_LENGTH + length-startIndex);
+            Console.BackgroundColor = startIndex == 0 ? Program.BACKGROUND_COLOR : ConsoleColor.White;
+            Console.ForegroundColor = startIndex == 0 ? ConsoleColor.White : Program.BACKGROUND_COLOR;
             Console.Write("Previous");
-            Console.SetCursorPosition(10+rowLength-4, 12 + length - startIndex);
+            Console.SetCursorPosition(10+rowLength-4, MAX_PLAYER_NAME_LENGTH + length - startIndex);
             var listEnded = startIndex + length > scoresSorted.Count;
-            Console.BackgroundColor = listEnded ? Program.backgroundColor : ConsoleColor.White;
-            Console.ForegroundColor = listEnded ? ConsoleColor.White : Program.backgroundColor;
+            Console.BackgroundColor = listEnded ? Program.BACKGROUND_COLOR : ConsoleColor.White;
+            Console.ForegroundColor = listEnded ? ConsoleColor.White : Program.BACKGROUND_COLOR;
             Console.Write("Next");
 
             Console.ForegroundColor = ConsoleColor.White;
-            Console.BackgroundColor = Program.backgroundColor;
+            Console.BackgroundColor = Program.BACKGROUND_COLOR;
         }
         
 
+        /// <summary>
+        /// Draws a single frame and gives back actions that the method
+        /// can't handle by itself.
+        /// </summary>
+        /// <param name="startTime">The start time of the last frame. Frame 0 requires the current time, all other ones require references to the same variable.</param>
+        /// <param name="grid">Should be the static grid usually (always).</param>
+        /// <returns></returns>
         static TickFinishedAction[] DrawFrame(ref DateTime startTime, ref bool[,] grid)
         {
             TickFinishedAction[] requiredActions = new TickFinishedAction[0] {};
@@ -582,11 +618,21 @@ namespace Tetris
             }
 
 
-
             return requiredActions;
 
         }
 
+
+        /// <summary>
+        /// Generates a new block in the way Tetris originally did.
+        /// There's a block pool which contains all of the blocks in the beginning.
+        /// One block is taken from the pool at random.
+        /// Once there are no blocks left, the pool resets.
+        /// </summary>
+        /// <param name="pool"></param>
+        /// <param name="allBlocks"></param>
+        /// <param name="rng"></param>
+        /// <returns></returns>
         static (Block, BlockPrototype) GenerateBlock(ref List<BlockPrototype> pool, BlockPrototype[] allBlocks, ref Random rng)
         {
             if (pool.Count == 0)
@@ -606,6 +652,10 @@ namespace Tetris
         }
     }
 
+    /// <summary>
+    /// Contains information about what might've happened
+    /// during a frame that a block can't handle by itself.
+    /// </summary>
     public enum TickFinishedAction
     {
         CreateNewBlock,
@@ -616,25 +666,36 @@ namespace Tetris
     {
         public ConsoleColor color;
         public bool[,] shape;
-        string name;
 
-        public BlockPrototype(ConsoleColor color, bool[,] shape, string name)
+        public BlockPrototype(ConsoleColor color, bool[,] shape)
         {
             this.color = color;
             this.shape = shape;
-            this.name = name;
         }
     }
-    public struct Block: ITransform
+
+    /// <summary>
+    /// A block as it exists in the grid. 
+    /// This can draw and rotate and more.
+    /// </summary>
+    public struct Block: IGameObject
     {
-        public const Byte tileWidth = 4;
-        public const Byte tileHeight = 2;
+        public const byte tileWidth = 4;
+        public const byte tileHeight = 2;
 
-
+        /// <summary>
+        /// The block prototype the block stems from.
+        /// This is used for rotation mainly. 
+        /// After the block has been placed, this is set to null to save memory.
+        /// </summary>
         public BlockPrototype prototype;
-        public SpaceInfo position;
-        public Byte[] currentShape;
-        public Byte width;
+        public PositionInfo position;
+
+        /// <summary>
+        /// The shape already rotated and potentially cut in bit-map format.
+        /// </summary>
+        public byte[] currentShape;
+        public byte width;
         private float time;
         public ConsoleColor color;
 
@@ -647,7 +708,7 @@ namespace Tetris
         /// <summary>
         /// Removes the row from the block if it exists.
         /// </summary>
-        /// <param name="row"></param>
+        /// <param name="row">The row in the grid layout (absolute).</param>
         public void RemoveRow(int row)
         {
             if (!this.placed) return;
@@ -721,10 +782,13 @@ namespace Tetris
                 }
             }
 
-            Console.BackgroundColor = Program.backgroundColor;
+            Console.BackgroundColor = Program.BACKGROUND_COLOR;
         }
 
-
+        /// <summary>
+        /// Gets the height of the block.
+        /// </summary>
+        /// <returns></returns>
         private int GetHeightBlocks()
         {
             int count = 0;
@@ -742,7 +806,7 @@ namespace Tetris
             return count;
         }
 
-        public SpaceInfo getSpaceInfo()
+        public PositionInfo GetSpaceInfo()
         {
             return this.position;
         }
@@ -751,11 +815,11 @@ namespace Tetris
         /// Erases the previous position and reraws the block in the new position.
         /// </summary>
         /// <param name="originalSpace"></param>
-        public void Redraw(SpaceInfo originalSpace)
+        public void Redraw(PositionInfo originalSpace)
         {
             var newPos = this.position;
             var colour = this.color;
-            this.color = Program.backgroundColor;
+            this.color = Program.BACKGROUND_COLOR;
             this.position = originalSpace;
 
             if (this.position.rotation != newPos.rotation)
@@ -791,7 +855,7 @@ namespace Tetris
         {
             for (int row = 0; row < currentShape.GetLength(0); row++)
             {
-                Byte rowContents = currentShape[row];
+                byte rowContents = currentShape[row];
                 for (int x = 0; x < width; x++)
                 {
                     bool filled = (rowContents >> (width - x) & 0x1) == 1;
@@ -814,12 +878,18 @@ namespace Tetris
             return false;
         }
 
-
+        /// <summary>
+        /// Whether the structure is outside the grid, touching another block or not.
+        /// This only works while the block hasn't made an entry to the grid, meaning 
+        /// that it shouldn't be placed at that point.
+        /// </summary>
+        /// <param name="previousGrid"></param>
+        /// <returns></returns>
         private bool InterferesWithGrid(bool[,] previousGrid)
         { 
             for (int row = 0; row < currentShape.GetLength(0); row++)
             {
-                Byte rowContents = currentShape[row];
+                byte rowContents = currentShape[row];
                 for (int x = 0; x < width; x++)
                 {
                     bool filled = (rowContents >> (width - x) & 0x1) == 1;
@@ -847,6 +917,12 @@ namespace Tetris
             return false;
         }
 
+        /// <summary>
+        /// Does whatever is necessary e.g. moving the block, rotating it and such.
+        /// </summary>
+        /// <param name="deltaTime">The time difference (in s) between now and the last time this has been executed.</param>
+        /// <param name="requiredActions">There for when the block triggers something it can't handle itself.</param>
+        /// <param name="grid">Where blocks have been placed statically already.</param>
         public void Tick(float deltaTime, ref TickFinishedAction[] requiredActions, ref bool[,] grid)
         {
             if (this.placed) {
@@ -912,7 +988,7 @@ namespace Tetris
                 if (InterferesWithGrid(grid)/*lowerEdgePosPhysical>=Programm.GRID_END*/)
                 {
                     Tetris.Program.score++;
-                    Tetris.Program.block_speed *= 0.99f;
+                    Tetris.Program.block_speed *= Program.BLOCK_SPEED_INCREASE;
                     this.placed = true;
                     this.prototype = null;
                     this.position.posY--;
@@ -941,10 +1017,10 @@ namespace Tetris
             switch (this.position.rotation)
             {
                 case 0:
-                    this.currentShape = new Byte[prototype.shape.GetLength(0)];
+                    this.currentShape = new byte[prototype.shape.GetLength(0)];
                     for (int i = 0; i < this.currentShape.GetLength(0); i++)
                     {
-                        Byte contents = 0;
+                        byte contents = 0;
 
                         for (int j = 0; j < this.width; j++)
                         {
@@ -964,13 +1040,13 @@ namespace Tetris
                     this.width = (byte)prototype.shape.GetLength(1);
                     var height = this.currentShape.GetLength(0);
                     var width = this.width;
-                    this.currentShape = new Byte[width];
+                    this.currentShape = new byte[width];
 
                     
 
                     for (int i = 0; i < width; i++)
                     {
-                        Byte contents = 0;
+                        byte contents = 0;
 
                         for (int j = 0; j < height; j++)
                         {
@@ -988,11 +1064,11 @@ namespace Tetris
                     break;
 
                 case 2:
-                    this.currentShape = new Byte[prototype.shape.GetLength(0)];
+                    this.currentShape = new byte[prototype.shape.GetLength(0)];
                     var height_ = this.currentShape.GetLength(0);
                     for (int i = 0; i < height_; i++)
                     {
-                        Byte contents = 0;
+                        byte contents = 0;
 
                         for (int j = this.width - 1; j >= 0; j--)
                         {
@@ -1011,13 +1087,13 @@ namespace Tetris
                     this.width = (byte)prototype.shape.GetLength(1);
                     var height__ = this.currentShape.GetLength(0);
                     var width_ = this.width;
-                    this.currentShape = new Byte[width_];
+                    this.currentShape = new byte[width_];
 
 
 
                     for (int i = 0; i < width_; i++)
                     {
-                        Byte contents = 0;
+                        byte contents = 0;
 
                         for (int j = 0; j < height__; j++)
                         {
@@ -1043,19 +1119,19 @@ namespace Tetris
             return true;
         }
 
-        public Block(BlockPrototype prototype, Byte x, Byte y)
+        public Block(BlockPrototype prototype, byte x, byte y)
         {
             this.prototype = prototype;
-            this.position = new SpaceInfo(x, y);
+            this.position = new PositionInfo(x, y);
             this.width = (byte)prototype.shape.GetLength(1);
-            this.currentShape = new Byte[prototype.shape.GetLength(0)];
+            this.currentShape = new byte[prototype.shape.GetLength(0)];
             this.placed = false;
             this.time = 0;
             this.color = prototype.color;
 
             for (int i = 0; i < this.currentShape.GetLength(0); i++)
             {
-                Byte contents = 0;
+                byte contents = 0;
 
                 for (int j = 0; j < this.width; j++)
                 {
@@ -1074,21 +1150,21 @@ namespace Tetris
     }
 
 
-    public struct SpaceInfo
+    public struct PositionInfo
     {
-        public Byte rotation;
-        public Byte posX;
-        public Byte posY;
+        public byte rotation;
+        public byte posX;
+        public byte posY;
 
 
-        public SpaceInfo(Byte posX, Byte posY)
+        public PositionInfo(byte posX, byte posY)
         {
             this.posX = posX;
             this.posY = posY;
             this.rotation = 0;
         }
 
-        public SpaceInfo(Byte posX, Byte posY, Byte rotation)
+        public PositionInfo(byte posX, byte posY, byte rotation)
         {
             this.posX = posX;
             this.posY = posY;
@@ -1097,17 +1173,42 @@ namespace Tetris
     }
 
 
-    public interface ITransform
+    /// <summary>
+    /// The worst mistake of this game.
+    /// Anyway, this is for anything that needs drawing and potentially re-drawing.
+    /// For things, that need to have executed Tick(...) on them every frame.
+    /// </summary>
+    public interface IGameObject
     {
+        /// <summary>
+        /// Draws the object once.
+        /// </summary>
         void Draw();
-        void Redraw(SpaceInfo originalSpace);
+        /// <summary>
+        /// Draws the object and removes it in the position provided.
+        /// </summary>
+        /// <param name="originalSpace"></param>
+        void Redraw(PositionInfo originalSpace);
 
-        SpaceInfo getSpaceInfo();
+        /// <summary>
+        /// Retrieves the current position and rotation of the object.
+        /// </summary>
+        /// <returns></returns>
+        PositionInfo GetSpaceInfo();
 
         void Tick(float deltaTime, ref TickFinishedAction[] requiredActions, ref bool[,] grid);
 
+        /// <summary>
+        /// Whether the object should be ticked.
+        /// </summary>
+        /// <returns></returns>
         bool CanEverTick();
 
+        /// <summary>
+        /// For blocks only. This proves that this should've been a class
+        /// instead of an interface all along.
+        /// </summary>
+        /// <param name="index"></param>
         void RemoveRow(int index);
     }
 }
@@ -1116,13 +1217,21 @@ namespace Input
 {
     internal class Program
     {
-        static public List<Input> currentInputs = new List<Input> { };  // globale Variable
+        /// <summary>
+        /// The inputs that haven't been handled yet.
+        /// </summary>
+        static public List<Input> currentInputs = new List<Input> { };
         static public bool running = true;
 
 
         public const int MAX_X = 150;
         public const int MAX_Y = 55;
 
+        private const string SAVE_FILE_NAME = "game_data.json";
+
+        /// <summary>
+        /// All data that should be persistent.
+        /// </summary>
         public static GameData gameData;
 
         static void Eingabe()
@@ -1148,11 +1257,14 @@ namespace Input
             }
         }
 
+        /// <summary>
+        /// Loads persistent data from the disk.
+        /// </summary>
         public static void LoadGameData()
         {
-            if (File.Exists("game_data.json"))
+            if (File.Exists(SAVE_FILE_NAME))
             {
-                string jsonString = File.ReadAllText("game_data.json");
+                string jsonString = File.ReadAllText(SAVE_FILE_NAME);
                 gameData = JsonSerializer.Deserialize<GameData>(jsonString);
             } else
             {
@@ -1160,13 +1272,13 @@ namespace Input
             }
         }
 
+        /// <summary>
+        /// Stores persistent data to the disk.
+        /// </summary>
         public static void StoreGameData()
         {
             string jsonString = JsonSerializer.Serialize(gameData);
-            Console.WriteLine("Storing: " + jsonString);
-            Console.WriteLine("Meaning #scores: " + gameData.highscores.Count);
-
-            File.WriteAllText("game_data.json", jsonString);
+            File.WriteAllText(SAVE_FILE_NAME, jsonString);
         }
 
         public enum Input
@@ -1246,9 +1358,7 @@ namespace Input
 
         public static void MenuAusgabe(ref int selectedEntry, string[] options)
         {
-            Console.SetCursorPosition(10, 2);
             Console.ForegroundColor = ConsoleColor.White;
-            Console.WriteLine("Menü (Abbruch mit 'esc')");
 
 
             int longestEntry = 0;
@@ -1301,7 +1411,9 @@ namespace Input
 
 
 
-                
+                Console.SetCursorPosition(10, 2);
+                Console.WriteLine("Menu (Quit with 'esc' or select quit)");
+
                 for (int i = 0; i < options.Length; i++)
                 {
                     if (i == selectedEntry)
@@ -1320,7 +1432,7 @@ namespace Input
             }
 
             Program.running = false;
-
+            StoreGameData();
 
             System.Environment.Exit(0);
 
