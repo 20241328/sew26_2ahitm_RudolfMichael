@@ -378,9 +378,13 @@ namespace Tetris
                         case TickFinishedAction.Died:
                             // Store the score if necessary
                             Input.Program.gameData.RegisterScore(playerName, score);
-                            Console.Clear();
+                            var repeat = ShowDeathScreen();
                             CleanUpGame();
 
+                            if (repeat)
+                            {
+                                continue;
+                            }
                             return;
                         default: break;
                     }
@@ -405,6 +409,18 @@ namespace Tetris
 
                 Thread.Sleep(10);
             }
+        }
+
+
+        static bool ShowDeathScreen()
+        {
+            Console.Clear();
+
+
+
+            Console.Clear();
+
+            return true;
         }
 
 
