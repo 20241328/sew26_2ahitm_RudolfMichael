@@ -2,14 +2,12 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using System.Threading;
 using Input;
-using Tetris;
 
 namespace Tetris
 {
@@ -29,10 +27,13 @@ namespace Tetris
         public const bool SKIP_TITLE = true;
         public const byte START_X = 5;
         public const int MAX_PLAYER_NAME_LENGTH = 15;
-        
+
 
         public static int score;
         public static string playerName = "Player 1";
+        private static List<IGameObject> objects = new List<IGameObject>();
+        public static float block_speed = 1f;
+        public static bool slowDownDrawing = false;
         public static BlockPrototype[] blockPrototypes = {
                 new BlockPrototype(
                         ConsoleColor.Blue,
@@ -90,14 +91,11 @@ namespace Tetris
                         }
                     )
             };
-        private static List<IGameObject> objects = new List<IGameObject>();
-        public static float block_speed = 1f;
-        public static bool slowDownDrawing = false;
 
 
-        private static string[] options = new string[] { "Start Game", "Leaderboard", "Settings", "Manual", "Quit",  };
-        
-       
+        private static string[] options = new string[] { "Start Game", "Leaderboard", "Settings", "Manual", "Quit", };
+
+
 
         private static string[] manual = new string[]
         {
@@ -118,7 +116,7 @@ namespace Tetris
         /// </summary>
         public static bool[,] staticGrid;
 
-        
+
 
         public static BlockPrototype[] letters = {
                 new BlockPrototype(
@@ -235,7 +233,7 @@ namespace Tetris
             RequestPlayerName();
 
 
-            
+
             int selectedOption = 0;
 
             while (!Input.Program.currentInputs.Contains(Input.Program.Input.Exit))
@@ -270,7 +268,7 @@ namespace Tetris
 
             for (int i = 0; i < manual.Length; i++)
             {
-                Console.SetCursorPosition(10, 10+i);
+                Console.SetCursorPosition(10, 10 + i);
                 Console.Write(manual[i]);
             }
 
@@ -329,13 +327,11 @@ namespace Tetris
 
             DateTime time = DateTime.Now;
 
-            while (!Input.Program.currentInputs.Contains(Input.Program.Input.Exit))
-            {
-                objects.Add(nextBlock);
-                (nextBlock, currentPrototype) = GenerateBlock(ref blockPool, blockPrototypes, ref rng);
+            objects.Add(nextBlock);
+            (nextBlock, currentPrototype) = GenerateBlock(ref blockPool, blockPrototypes, ref rng);
 
-             for (int i = 0; i < 10000; i++)
-                {
+            while (true)
+            {
                 foreach (TickFinishedAction action in DrawFrame(ref time, ref staticGrid))
                 {
                     switch (action)
@@ -391,42 +387,40 @@ namespace Tetris
                     DeleteRow(ref objects, GRID_END - 1);
                 }
 
-
-                    Thread.Sleep(10);
+                if (Input.Program.ProcessKey(Input.Program.Input.Exit))
+                {
+                    CleanUpGame();
+                    Console.Clear();
+                    return;
                 }
 
 
-                Thread.Sleep(1000);
-                objects = new List<IGameObject>();
-                Console.Clear();
+                Thread.Sleep(10);
             }
-            Input.Program.currentInputs.Clear();
-
         }
 
 
 
+        /// <summary>
+        /// Removes static rests of the game.
+        /// This does not register the score.
+        /// </summary>
+        static void CleanUpGame()
+        {
+            // Reset the game state
+            score = 0;
+            block_speed = 1f;
+            objects = new List<IGameObject>();
+            Input.Program.currentInputs.Clear();
+        }
 
 
-            /// <summary>
-            /// Removes static rests of the game.
-            /// This does not register the score.
-            /// </summary>
-            static void CleanUpGame()
-            {
-                // Reset the game state
-                score = 0;
-                block_speed = 1f;
-                objects = new List<IGameObject>();
-            }
-
-
-            /// <summary>
-            /// Shows a screen to the player asking the player
-            /// to enter their name and stores the result to the PLAYER_NAME
-            /// variable if OK.
-            /// </summary>
-            static void RequestPlayerName()
+        /// <summary>
+        /// Shows a screen to the player asking the player
+        /// to enter their name and stores the result to the PLAYER_NAME
+        /// variable if OK.
+        /// </summary>
+        static void RequestPlayerName()
         {
             Console.ForegroundColor = ConsoleColor.White;
             Console.SetCursorPosition(20, 10);
@@ -489,18 +483,18 @@ namespace Tetris
 
             int page = 0;
 
-            DrawLeaderboard(page*10, 10, bestScores);
+            DrawLeaderboard(page * 10, 10, bestScores);
 
             while (!Input.Program.ProcessKey(Input.Program.Input.Exit))
             {
                 if (Input.Program.ProcessKey(Input.Program.Input.Left))
                 {
-                    if (page > 0) DrawLeaderboard(--page*10, 10, bestScores);
+                    if (page > 0) DrawLeaderboard(--page * 10, 10, bestScores);
                 }
 
                 if (Input.Program.ProcessKey(Input.Program.Input.Right))
                 {
-                    if (page < bestScores.Count / 10) DrawLeaderboard(++page*10, 10, bestScores);
+                    if (page < bestScores.Count / 10) DrawLeaderboard(++page * 10, 10, bestScores);
                 }
 
                 Thread.Sleep(16);
@@ -522,7 +516,7 @@ namespace Tetris
 
             if (lastIndex > scoresSorted.Count) lastIndex = scoresSorted.Count;
 
-            string title = $"Leaderboard ({startIndex+1}...{lastIndex} from {scoresSorted.Count})";
+            string title = $"Leaderboard ({startIndex + 1}...{lastIndex} from {scoresSorted.Count})";
 
             Console.SetCursorPosition(center - title.Length / 2, 5);    // Center the text above the board
             Console.Write(title);
@@ -568,14 +562,14 @@ namespace Tetris
                 Console.SetCursorPosition(10, posY);
                 Console.Write(emptyRowString);      // For the background
                 Console.SetCursorPosition(10, posY);
-                Console.Write($"{i+1,3}.\t{item.playerName,MAX_PLAYER_NAME_LENGTH}\t{item.value,5}");
+                Console.Write($"{i + 1,3}.\t{item.playerName,MAX_PLAYER_NAME_LENGTH}\t{item.value,5}");
             }
 
-            Console.SetCursorPosition(10, MAX_PLAYER_NAME_LENGTH + length-startIndex);
+            Console.SetCursorPosition(10, MAX_PLAYER_NAME_LENGTH + length - startIndex);
             Console.BackgroundColor = startIndex == 0 ? Program.BACKGROUND_COLOR : ConsoleColor.White;
             Console.ForegroundColor = startIndex == 0 ? ConsoleColor.White : Program.BACKGROUND_COLOR;
             Console.Write("Previous");
-            Console.SetCursorPosition(10+rowLength-4, MAX_PLAYER_NAME_LENGTH + length - startIndex);
+            Console.SetCursorPosition(10 + rowLength - 4, MAX_PLAYER_NAME_LENGTH + length - startIndex);
             var listEnded = startIndex + length > scoresSorted.Count;
             Console.BackgroundColor = listEnded ? Program.BACKGROUND_COLOR : ConsoleColor.White;
             Console.ForegroundColor = listEnded ? ConsoleColor.White : Program.BACKGROUND_COLOR;
@@ -584,7 +578,7 @@ namespace Tetris
             Console.ForegroundColor = ConsoleColor.White;
             Console.BackgroundColor = Program.BACKGROUND_COLOR;
         }
-        
+
 
         /// <summary>
         /// Draws a single frame and gives back actions that the method
@@ -595,13 +589,13 @@ namespace Tetris
         /// <returns></returns>
         static TickFinishedAction[] DrawFrame(ref DateTime startTime, ref bool[,] grid)
         {
-            TickFinishedAction[] requiredActions = new TickFinishedAction[0] {};
+            TickFinishedAction[] requiredActions = new TickFinishedAction[0] { };
 
             float deltaTime = (float)(DateTime.Now - startTime).TotalSeconds;
             startTime = DateTime.Now;
 
             Console.SetCursorPosition(0, 1);
-            Console.Write($"FPS: {(int)(1/deltaTime)}; Speed: {block_speed}, Score: {score}");
+            Console.Write($"FPS: {(int)(1 / deltaTime)}; Speed: {block_speed}, Score: {score}");
 
             if (objects != null)
             {
@@ -640,7 +634,7 @@ namespace Tetris
                 pool = allBlocks.ToList();
             }
 
-            
+
             int index = rng.Next(0, pool.Count);
 
             BlockPrototype prototype = pool[index];
@@ -678,7 +672,7 @@ namespace Tetris
     /// A block as it exists in the grid. 
     /// This can draw and rotate and more.
     /// </summary>
-    public struct Block: IGameObject
+    public struct Block : IGameObject
     {
         public const byte tileWidth = 4;
         public const byte tileHeight = 2;
@@ -757,7 +751,7 @@ namespace Tetris
                 byte rowContents = currentShape[row];
                 for (int j = 0; j < tileHeight; j++)
                 {
-                    
+
                     Console.SetCursorPosition(position.posX * Block.tileWidth, (position.posY * Block.tileHeight) + (row * tileHeight) + j);
                     for (int x = 0; x < width; x++)
                     {
@@ -866,10 +860,10 @@ namespace Tetris
 
                     if (filledBefore)
                     {
-                        
+
                         return true;
                     }
-                    
+
                     currentGrid[row + position.posY, x + position.posX] = true;
 
                 }
@@ -886,7 +880,7 @@ namespace Tetris
         /// <param name="previousGrid"></param>
         /// <returns></returns>
         private bool InterferesWithGrid(bool[,] previousGrid)
-        { 
+        {
             for (int row = 0; row < currentShape.GetLength(0); row++)
             {
                 byte rowContents = currentShape[row];
@@ -925,7 +919,8 @@ namespace Tetris
         /// <param name="grid">Where blocks have been placed statically already.</param>
         public void Tick(float deltaTime, ref TickFinishedAction[] requiredActions, ref bool[,] grid)
         {
-            if (this.placed) {
+            if (this.placed)
+            {
                 return;
             }
             this.time += deltaTime;
@@ -934,7 +929,7 @@ namespace Tetris
 
             if (Input.Program.ProcessKey(Input.Program.Input.RotateUp))
             {
-                
+
                 Rotate(this.prototype);
 
                 if (InterferesWithGrid(grid))
@@ -970,7 +965,8 @@ namespace Tetris
                 if (InterferesWithGrid(grid))
                 {
                     this.position.posX--;
-                } else
+                }
+                else
                 {
                     needsRedrawing = true;
                 }
@@ -979,7 +975,8 @@ namespace Tetris
 
 
 
-            if (this.time > Program.block_speed | Input.Program.ProcessKey(Input.Program.Input.Down)) {
+            if (this.time > Program.block_speed | Input.Program.ProcessKey(Input.Program.Input.Down))
+            {
                 this.time = 0;
                 this.position.posY++;
 
@@ -1042,7 +1039,7 @@ namespace Tetris
                     var width = this.width;
                     this.currentShape = new byte[width];
 
-                    
+
 
                     for (int i = 0; i < width; i++)
                     {
@@ -1106,7 +1103,7 @@ namespace Tetris
                         }
 
 
-                        this.currentShape[width_-i-1] = contents;
+                        this.currentShape[width_ - i - 1] = contents;
                     }
                     break;
 
