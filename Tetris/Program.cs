@@ -23,14 +23,14 @@ namespace Tetris
         public const byte GRID_WIDTH = 10;
         public const byte NEXT_POS_Y = 5;
         public const byte NEXT_POS_X = 20;
-        public const byte START_Y = 5;
+        public const byte START_Y = 0;
         public const bool SKIP_TITLE = true;
-        public const byte START_X = 5;
+        public const byte START_X = GRID_WIDTH / 2;
         public const int MAX_PLAYER_NAME_LENGTH = 15;
 
 
         public static int score;
-        public static string playerName = "Player 1";
+        public static string playerName = "";
         private static List<IGameObject> objects = new List<IGameObject>();
         public static float block_speed = 1f;
         public static bool slowDownDrawing = false;
@@ -192,7 +192,7 @@ namespace Tetris
         public static ISetting[] settings =
         {
             new NameSetting(),
-            new NameSetting(),
+            new NamePreservationSetting(),
         };
 
         /// <summary>
@@ -221,6 +221,7 @@ namespace Tetris
         static void Main(string[] args)
         {
             Console.OutputEncoding = Encoding.UTF8;
+            Console.InputEncoding = Encoding.UTF8;
 
 
             Console.Clear();
@@ -235,7 +236,7 @@ namespace Tetris
 
             Input.Program.LoadGameData();
 
-            RequestPlayerName();
+            if (playerName == "") RequestPlayerName();
 
 
 
@@ -411,16 +412,59 @@ namespace Tetris
             }
         }
 
-
+        /// <summary>
+        /// Shows the death screen with the player's score and such.
+        /// </summary>
+        /// <returns>Whether the game should be instantly restartet (true) or not.</returns>
         static bool ShowDeathScreen()
         {
             Console.Clear();
+            Console.ForegroundColor = ConsoleColor.White;
+
+            bool selectedRestart = true;
+            while (true)
+            {
+                Console.SetCursorPosition(22, 7);
+                Console.Write("You Died");
+                Console.SetCursorPosition(21, 8);
+                Console.Write("Score: " + score);
 
 
+                Console.SetCursorPosition(10, 20);
+                Console.BackgroundColor = selectedRestart ? ConsoleColor.Blue : Program.BACKGROUND_COLOR;
+                Console.Write("Play Again");
+                Console.SetCursorPosition(35, 20);
+                Console.BackgroundColor = !selectedRestart ? ConsoleColor.Blue : Program.BACKGROUND_COLOR;
+                Console.Write("Menu");
+                Console.BackgroundColor = Program.BACKGROUND_COLOR;
 
-            Console.Clear();
 
-            return true;
+                while (true)
+                {
+                    if (Input.Program.ProcessKey(Input.Program.Input.Left))
+                    {
+                        selectedRestart = true;
+                        break;
+                    }
+
+                    if (Input.Program.ProcessKey(Input.Program.Input.Right))
+                    {
+                        selectedRestart = false; break;
+                    }
+
+                    if (Input.Program.ProcessKey(Input.Program.Input.Select))
+                    {
+                        return selectedRestart;
+                    }
+
+                    if (Input.Program.ProcessKey(Input.Program.Input.Exit))
+                    {
+                        return true;
+                    }
+
+                    Thread.Sleep(16);
+                }
+            }
         }
 
 
@@ -435,6 +479,7 @@ namespace Tetris
             block_speed = 1f;
             objects = new List<IGameObject>();
             Input.Program.currentInputs.Clear();
+            Console.Clear();
         }
 
         /// <summary>
@@ -539,6 +584,8 @@ namespace Tetris
                 Console.ForegroundColor = ConsoleColor.Red;
                 RequestPlayerName();
             }
+
+            Input.Program.gameData.lastPlayer = playerName;
 
             Console.Clear();
         }
@@ -707,9 +754,7 @@ namespace Tetris
 
                     if (Input.Program.ProcessKey(Input.Program.Input.Select))
                     {
-                        Console.Clear();
                         settings[selectedEntry].Select();
-                        Console.Clear();
                         break;
                     }
 
@@ -750,7 +795,33 @@ namespace Tetris
 
         public void Select()
         {
+            Console.Clear();
             Program.RequestPlayerName();
+            Console.Clear();
+        }
+    }
+
+    public class NamePreservationSetting: ISetting
+    {
+        public string GetName()
+        {
+            return "Preserve Player";
+        }
+
+        public string GetValue()
+        {
+            return Input.Program.gameData.preservePlayerName ? "Yes" : "No";
+        }
+
+        public string GetDescription()
+        {
+            return "During game start, you won't be asked for your name\nand the last player will be used for that.";
+        }
+
+        public void Select()
+        {
+            Input.Program.gameData.preservePlayerName = !Input.Program.gameData.preservePlayerName;
+            Input.Program.StoreGameData();
         }
     }
 
@@ -859,8 +930,12 @@ namespace Tetris
                 byte rowContents = currentShape[row];
                 for (int j = 0; j < tileHeight; j++)
                 {
-
-                    Console.SetCursorPosition(position.posX * Block.tileWidth, (position.posY * Block.tileHeight) + (row * tileHeight) + j);
+                    var targetY = (position.posY * Block.tileHeight) + (row * tileHeight) + j;
+                    if (targetY < Console.BufferHeight)
+                    {
+                        Console.SetCursorPosition(position.posX * Block.tileWidth, targetY);
+                    }
+                    
                     for (int x = 0; x < width; x++)
                     {
                         bool filled = (rowContents >> (width - x) & 0x1) == 1;
@@ -1371,6 +1446,11 @@ namespace Input
             {
                 string jsonString = File.ReadAllText(SAVE_FILE_NAME);
                 gameData = JsonSerializer.Deserialize<GameData>(jsonString);
+
+                if (gameData.preservePlayerName)
+                {
+                    Tetris.Program.playerName = gameData.lastPlayer;
+                }
             } else
             {
                 gameData = GameData.GetNew();
@@ -1382,8 +1462,17 @@ namespace Input
         /// </summary>
         public static void StoreGameData()
         {
+            var name = gameData.lastPlayer;
+
+            if (!gameData.preservePlayerName)
+            {
+                gameData.lastPlayer = "";
+            }
+
             string jsonString = JsonSerializer.Serialize(gameData);
             File.WriteAllText(SAVE_FILE_NAME, jsonString);
+
+            gameData.lastPlayer = name;
         }
 
         public enum Input
@@ -1549,6 +1638,12 @@ namespace Input
         [JsonPropertyName("highscores")]
         public List<Score> highscores { get; set; }
 
+        [JsonPropertyName("preserve_player_name")]
+        public bool preservePlayerName { get; set; }
+
+        [JsonPropertyName("last_player")]
+        public string lastPlayer { get; set; }
+
 
         /// <summary>
         /// Sets the new highscore for a player if it is that player's best.
@@ -1580,6 +1675,7 @@ namespace Input
         {
             GameData data = new GameData();
             data.highscores = new List<Score>();
+            data.preservePlayerName = false;
 
             return data;
         }
