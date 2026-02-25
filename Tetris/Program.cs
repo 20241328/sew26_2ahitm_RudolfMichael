@@ -338,6 +338,10 @@ namespace Tetris
 
             objects.Add(nextBlock);
             (nextBlock, currentPrototype) = GenerateBlock(ref blockPool, blockPrototypes, ref rng);
+            nextBlock.position.posX = 20;
+            nextBlock.position.posY = 10;
+            nextBlock.Draw();
+            objects.Add(nextBlock);
 
             while (true)
             {
@@ -346,8 +350,21 @@ namespace Tetris
                     switch (action)
                     {
                         case TickFinishedAction.CreateNewBlock:
+                            objects.RemoveAt(objects.Count - 1);
+                            nextBlock.placed = false;
+                            nextBlock.color = Program.BACKGROUND_COLOR;
+                            nextBlock.Draw();
+                            nextBlock.color = nextBlock.prototype.color;
+                            nextBlock.position.posX = START_X;
+                            nextBlock.position.posY = START_Y;
+                            nextBlock.notAnObsticle = false;
                             objects.Add(nextBlock);
                             (nextBlock, currentPrototype) = GenerateBlock(ref blockPool, blockPrototypes, ref rng);
+                            nextBlock.placed = true;
+                            nextBlock.position.posX = 20;
+                            nextBlock.position.posY = 10;
+                            nextBlock.Draw();
+                            objects.Add(nextBlock);
 
                             // A block has been placed, so it needs to be checked if any rows are full
                             for (int row = 0; row < staticGrid.GetLength(0) - 2; row++)
@@ -543,6 +560,7 @@ namespace Tetris
             pool.RemoveAt(index);
 
             var block = new Block(prototype, START_X, START_Y);
+            block.notAnObsticle = true;
 
             return (block, prototype);
         }
@@ -872,6 +890,8 @@ namespace Tetris
         private float time;
         public ConsoleColor color;
 
+        public bool notAnObsticle;
+
         /// <summary>
         /// If the block is "placed", it can no longer move
         /// </summary>
@@ -1030,6 +1050,7 @@ namespace Tetris
         /// <returns></returns>
         private bool PlaceInGrid(ref bool[,] currentGrid)
         {
+            if (this.notAnObsticle) return false;
             for (int row = 0; row < currentShape.GetLength(0); row++)
             {
                 byte rowContents = currentShape[row];
@@ -1308,6 +1329,7 @@ namespace Tetris
             this.placed = false;
             this.time = 0;
             this.color = prototype.color;
+            this.notAnObsticle = false;
 
             for (int i = 0; i < this.currentShape.GetLength(0); i++)
             {
