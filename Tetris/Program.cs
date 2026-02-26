@@ -24,7 +24,6 @@ namespace Tetris
         public const byte NEXT_POS_Y = 5;
         public const byte NEXT_POS_X = 20;
         public const byte START_Y = 0;
-        public const bool SKIP_TITLE = true;
         public const byte START_X = GRID_WIDTH / 2;
         public const int MAX_PLAYER_NAME_LENGTH = 15;
 
@@ -194,6 +193,7 @@ namespace Tetris
             new NameSetting(),
             new NamePreservationSetting(),
             new ExtremeModeSetting(),
+            new TitleScreenSetting(),
         };
 
         /// <summary>
@@ -228,14 +228,18 @@ namespace Tetris
             Console.Clear();
 
             Input.Program.Start(args);
+            Input.Program.LoadGameData();
             Console.Clear();
 
-            if (!SKIP_TITLE)
+
+            if (Input.Program.gameData.showTitleScreen)
             {
+                slowDownDrawing = true;
                 ShowTitle();
+                slowDownDrawing = false;
             }
 
-            Input.Program.LoadGameData();
+            
 
             if (playerName == "") RequestPlayerName();
 
@@ -301,14 +305,13 @@ namespace Tetris
             int charOffset = 1;
             foreach (BlockPrototype prototype in letters)
             {
-                int letterOffset = charOffset * Block.tileWidth;
+                int letterOffset = charOffset;
                 Block myLetter = new Block(prototype, (byte)(letterOffset), 5);
                 myLetter.Draw();
                 charOffset += prototype.shape.GetLength(1) + 1;
-                Thread.Sleep(150);
             }
 
-            Thread.Sleep(4000);
+            Thread.Sleep(3000);
             Console.Clear();
         }
 
@@ -887,12 +890,36 @@ namespace Tetris
 
         public string GetDescription()
         {
-            return "Makes the game a bit harde.";
+            return "Makes the game a bit harder.";
         }
 
         public void Select()
         {
             Input.Program.gameData.extremeMode = !Input.Program.gameData.extremeMode;
+            Input.Program.StoreGameData();
+        }
+    }
+
+    public class TitleScreenSetting : ISetting
+    {
+        public string GetName()
+        {
+            return "Show Title Screen";
+        }
+
+        public string GetValue()
+        {
+            return Input.Program.gameData.showTitleScreen ? "Yes" : "No";
+        }
+
+        public string GetDescription()
+        {
+            return "Whether the title screen should be shown for 4s or be skipped instead.";
+        }
+
+        public void Select()
+        {
+            Input.Program.gameData.showTitleScreen = !Input.Program.gameData.showTitleScreen;
             Input.Program.StoreGameData();
         }
     }
@@ -1723,6 +1750,9 @@ namespace Input
         [JsonPropertyName("extreme_mode")]
         public bool extremeMode { get; set; }
 
+        [JsonPropertyName("show_title_screen")]
+        public bool showTitleScreen { get; set; }
+
 
         /// <summary>
         /// Sets the new highscore for a player if it is that player's best.
@@ -1756,6 +1786,7 @@ namespace Input
             data.highscores = new List<Score>();
             data.preservePlayerName = false;
             data.extremeMode = false;
+            data.showTitleScreen = true;
 
             return data;
         }
