@@ -330,21 +330,20 @@ namespace Tetris
             score = 0;
             Console.Clear();
 
-            Block[] blocks = new Block[0];
+            //Block[] blocks = new Block[0];
             List<BlockPrototype> blockPool = new List<BlockPrototype>();
             Random rng = new Random();
-
-            (Block nextBlock, BlockPrototype currentPrototype) = GenerateBlock(ref blockPool, blockPrototypes, ref rng);
-            nextBlock.notAnObsticle = false;
-
-            IGameObject[] existingTransforms = new IGameObject[0];
-
             DateTime time = DateTime.Now;
 
-            objects.Add(nextBlock);
+            // Generate the first block and place it at the start position
+            (Block nextBlock, BlockPrototype currentPrototype) = GenerateBlock(ref blockPool, blockPrototypes, ref rng);
+            nextBlock.notAnObsticle = false;
+            nextBlock.position.posX = START_X;
+            nextBlock.position.posY = START_Y; objects.Add(nextBlock);
+
+
+            // Generate the next block and place it where you can see the next block
             (nextBlock, currentPrototype) = GenerateBlock(ref blockPool, blockPrototypes, ref rng);
-            nextBlock.position.posX = 20;
-            nextBlock.position.posY = 10;
             if (!Input.Program.gameData.extremeMode)
             {
                 nextBlock.notAnObsticle = true;
@@ -360,19 +359,30 @@ namespace Tetris
                     switch (action)
                     {
                         case TickFinishedAction.CreateNewBlock:
-                            objects.RemoveAt(objects.Count - 1);
+                            if (objects.Count != 0) {
+                                // Remove the latest block, which is only there for displaying 
+                                // what will be next to the user
+                                objects.RemoveAt(objects.Count - 1);
+                            }
+                            // Update it so it can be at the center
+                            // 1. Redraw it black so it's no longer visible
+                            //    on the right side.
                             nextBlock.placed = false;
                             nextBlock.color = Program.BACKGROUND_COLOR;
                             nextBlock.Draw();
                             nextBlock.color = nextBlock.prototype.color;
+
+                            // 2. Update the position
                             nextBlock.position.posX = START_X;
                             nextBlock.position.posY = START_Y;
                             nextBlock.notAnObsticle = false;
+
+                            // 3. Add it back to the game objects for it to be ticked
                             objects.Add(nextBlock);
+
+                            // Generate the next block
                             (nextBlock, currentPrototype) = GenerateBlock(ref blockPool, blockPrototypes, ref rng);
                             nextBlock.placed = true;
-                            nextBlock.position.posX = 20;
-                            nextBlock.position.posY = 10;
                             nextBlock.Draw();
                             objects.Add(nextBlock);
 
@@ -572,6 +582,10 @@ namespace Tetris
             var block = new Block(prototype, START_X, START_Y);
             block.notAnObsticle = true;
 
+
+            block.position.posX = 20;
+            block.position.posY = 10;
+
             return (block, prototype);
         }
 
@@ -694,49 +708,66 @@ namespace Tetris
             {
                 Score item = scoresSorted[i];
 
-                switch (i)
-                {
-                    case 0:
-                        Console.BackgroundColor = ConsoleColor.DarkYellow;  // Gold?
-                        goto BLACK;
-                    case 1:
-                        Console.BackgroundColor = ConsoleColor.Gray;        // Silver?
-                        goto BLACK;
-                    case 2:
-                        Console.BackgroundColor = ConsoleColor.DarkGray;    // K.A.?
-                        goto BLACK;
-                    default:
-                        Console.ForegroundColor = ConsoleColor.White;
-                        Console.BackgroundColor = Program.BACKGROUND_COLOR;
-                        break;
-                    BLACK:
-                        Console.ForegroundColor = ConsoleColor.Black;
-                        break;
-                }
+                Console.BackgroundColor = GetBackgroundColorForScore(item, i);
 
-                if (item.playerName == playerName)
+                if (Console.BackgroundColor == Program.BACKGROUND_COLOR)
                 {
-                    // Highlight the current user
-                    Console.BackgroundColor = ConsoleColor.Red;
+                    Console.ForegroundColor = ConsoleColor.White;
+                } else
+                {
+                    Console.ForegroundColor = ConsoleColor.Black;
                 }
 
                 var posY = 10 + i - startIndex;
+                // Draw the background
                 Console.SetCursorPosition(10, posY);
-                Console.Write(emptyRowString);      // For the background
+                Console.Write(emptyRowString);      
+                // Draw the text
                 Console.SetCursorPosition(10, posY);
                 Console.Write($"{i + 1,3}.\t{item.playerName,MAX_PLAYER_NAME_LENGTH}\t{item.value,5}");
             }
 
-            Console.SetCursorPosition(10, MAX_PLAYER_NAME_LENGTH + length - startIndex);
-            Console.BackgroundColor = startIndex == 0 ? Program.BACKGROUND_COLOR : ConsoleColor.White;
-            Console.ForegroundColor = startIndex == 0 ? ConsoleColor.White : Program.BACKGROUND_COLOR;
-            Console.Write("Previous");
-            Console.SetCursorPosition(10 + rowLength - 4, MAX_PLAYER_NAME_LENGTH + length - startIndex);
-            var listEnded = startIndex + length > scoresSorted.Count;
-            Console.BackgroundColor = listEnded ? Program.BACKGROUND_COLOR : ConsoleColor.White;
-            Console.ForegroundColor = listEnded ? ConsoleColor.White : Program.BACKGROUND_COLOR;
-            Console.Write("Next");
 
+            int buttonsY = MAX_PLAYER_NAME_LENGTH + length - startIndex;
+            bool startOfList = startIndex == 0;
+            var listEnded = startIndex + length > scoresSorted.Count;
+            DrawButton("Previous", !startOfList, 10, buttonsY);
+            DrawButton("Next", !listEnded, 10 + rowLength - 4, buttonsY);
+        }
+
+        /// <summary>
+        /// Gets the color that should be used as a background for the row 
+        /// with the given score in the leaderboard.
+        /// </summary>
+        /// <param name="score"></param>
+        /// <param name="index"></param>
+        /// <returns></returns>
+        static ConsoleColor GetBackgroundColorForScore(Score score, int index)
+        {
+            if (score.playerName == playerName)
+            {
+                return ConsoleColor.Red;
+            }
+
+            switch (index)
+            {
+                case 0:
+                    return ConsoleColor.DarkYellow;
+                case 1:
+                    return ConsoleColor.Gray;
+                case 2:
+                    return ConsoleColor.DarkGray;
+                default:
+                    return Program.BACKGROUND_COLOR;
+            }
+        }
+
+        static void DrawButton(string text, bool selectable, int posX, int posY)
+        {
+            Console.SetCursorPosition(posX, posY);
+            Console.BackgroundColor = selectable ? ConsoleColor.White : Program.BACKGROUND_COLOR;
+            Console.ForegroundColor = selectable ? Program.BACKGROUND_COLOR : ConsoleColor.White;
+            Console.Write(text);
             Console.ForegroundColor = ConsoleColor.White;
             Console.BackgroundColor = Program.BACKGROUND_COLOR;
         }
@@ -819,6 +850,10 @@ namespace Tetris
         }
     }
 
+    /// <summary>
+    /// This should've been an abstract class.
+    /// Anyway, this is how settings are represented.
+    /// </summary>
     public interface ISetting
     {
         string GetName();
