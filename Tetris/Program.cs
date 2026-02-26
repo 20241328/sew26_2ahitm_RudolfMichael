@@ -193,6 +193,7 @@ namespace Tetris
         {
             new NameSetting(),
             new NamePreservationSetting(),
+            new ExtremeModeSetting(),
         };
 
         /// <summary>
@@ -331,6 +332,7 @@ namespace Tetris
             Random rng = new Random();
 
             (Block nextBlock, BlockPrototype currentPrototype) = GenerateBlock(ref blockPool, blockPrototypes, ref rng);
+            nextBlock.notAnObsticle = false;
 
             IGameObject[] existingTransforms = new IGameObject[0];
 
@@ -340,6 +342,11 @@ namespace Tetris
             (nextBlock, currentPrototype) = GenerateBlock(ref blockPool, blockPrototypes, ref rng);
             nextBlock.position.posX = 20;
             nextBlock.position.posY = 10;
+            if (!Input.Program.gameData.extremeMode)
+            {
+                nextBlock.notAnObsticle = true;
+                nextBlock.placed = true;
+            }
             nextBlock.Draw();
             objects.Add(nextBlock);
 
@@ -752,8 +759,31 @@ namespace Tetris
                     Console.BackgroundColor = i == selectedEntry ? ConsoleColor.Blue : Program.BACKGROUND_COLOR;
                     Console.SetCursorPosition(10, 5 + i);
                     Console.Write(emptyRowString);
-                    Console.SetCursorPosition(10, 5 + i);
-                    Console.Write($"{setting.GetName(),20}\t\t{setting.GetValue(),10}");
+                    Console.SetCursorPosition(12, 5 + i);
+                    Console.Write(setting.GetName());
+                    Console.SetCursorPosition(46, 5 + i);
+                    Console.Write($"{setting.GetValue(),10}");
+                    
+
+                    
+                    if (i == selectedEntry)
+                    {
+                        Console.BackgroundColor = Program.BACKGROUND_COLOR;
+                        string[] descriptionLines = setting.GetDescription().Split('\n');
+
+                        for (int j = 0; j < descriptionLines.Length; j++)
+                        {
+                            string line = descriptionLines[j].Trim();
+                            Console.SetCursorPosition(10, 40 + j);
+                            Console.Write(line + emptyRowString + emptyRowString);
+                        }
+
+                        for (int j = 0; j < 5 - descriptionLines.Length; j++)
+                        {
+                            Console.SetCursorPosition(10, 40 + j + descriptionLines.Length);
+                            Console.Write(emptyRowString + emptyRowString + emptyRowString);
+                        }
+                    }
                 }
 
                 while (true)
@@ -839,6 +869,30 @@ namespace Tetris
         public void Select()
         {
             Input.Program.gameData.preservePlayerName = !Input.Program.gameData.preservePlayerName;
+            Input.Program.StoreGameData();
+        }
+    }
+
+    public class ExtremeModeSetting : ISetting
+    {
+        public string GetName()
+        {
+            return "Extreme Mode";
+        }
+
+        public string GetValue()
+        {
+            return Input.Program.gameData.extremeMode ? "Yes" : "No";
+        }
+
+        public string GetDescription()
+        {
+            return "Makes the game a bit harde.";
+        }
+
+        public void Select()
+        {
+            Input.Program.gameData.extremeMode = !Input.Program.gameData.extremeMode;
             Input.Program.StoreGameData();
         }
     }
@@ -1666,6 +1720,9 @@ namespace Input
         [JsonPropertyName("last_player")]
         public string lastPlayer { get; set; }
 
+        [JsonPropertyName("extreme_mode")]
+        public bool extremeMode { get; set; }
+
 
         /// <summary>
         /// Sets the new highscore for a player if it is that player's best.
@@ -1698,6 +1755,7 @@ namespace Input
             GameData data = new GameData();
             data.highscores = new List<Score>();
             data.preservePlayerName = false;
+            data.extremeMode = false;
 
             return data;
         }
