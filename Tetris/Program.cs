@@ -20,11 +20,12 @@ namespace Tetris
         /// </summary>
         public const float BLOCK_SPEED_INCREASE = 0.99f;
         public const ConsoleColor BACKGROUND_COLOR = ConsoleColor.Black;
-        public const byte GRID_END = 24;
+        public const ConsoleColor GRID_COLOR = ConsoleColor.DarkGray;
+        public const byte GRID_HEIGHT = 25;
         public const byte GRID_WIDTH = 10;
         public const byte NEXT_POS_Y = 5;
         public const byte NEXT_POS_X = 20;
-        public const byte START_Y = 0;
+        public const byte START_Y = 1;
         public const byte START_X = GRID_WIDTH / 2;
         public const int MAX_PLAYER_NAME_LENGTH = 15;
 
@@ -202,14 +203,14 @@ namespace Tetris
         /// </summary>
         private static void SetUpGrid()
         {
-            staticGrid = new bool[GRID_END + 2, GRID_WIDTH + 2];
+            staticGrid = new bool[GRID_HEIGHT + 2, GRID_WIDTH + 2];
 
             for (int i = 0; i < staticGrid.GetLength(0); i++)
             {
                 staticGrid[i, 0] = true;
                 staticGrid[i, GRID_WIDTH + 1] = true;
 
-                if (i == 0 || i >= GRID_END)
+                if (i == 0 || i >= GRID_HEIGHT)
                 {
                     for (int j = 1; j < staticGrid.GetLength(1) - 1; j++)
                     {
@@ -218,6 +219,24 @@ namespace Tetris
                     }
                 }
             }
+
+            DrawGrid();
+        }
+
+        private static void DrawGrid()
+        {
+            int startX = 1 * Block.tileWidth;
+            int startY = START_Y * Block.tileHeight;
+
+            int lengthX = GRID_WIDTH * Block.tileWidth;
+            int stopY = GRID_HEIGHT * Block.tileHeight;
+
+            for (int i = startY; i < stopY; i++)
+            {
+                DrawBar(lengthX, (startX, i), GRID_COLOR);
+            }
+
+            Console.BackgroundColor = BACKGROUND_COLOR;
         }
 
         static void Main(string[] args)
@@ -255,7 +274,6 @@ namespace Tetris
                 switch (selectedOption)
                 {
                     case 0:
-                        SetUpGrid();
                         ShowGame();
                         Input.Program.StoreGameData();
                         break;
@@ -320,6 +338,7 @@ namespace Tetris
         {
             SetUpGrid();
             Console.Clear();
+            DrawGrid();
             for (int i = 0; i < blocks.Count; i++)
             {
                 blocks[i].RemoveRow(index);
@@ -331,14 +350,15 @@ namespace Tetris
             score = 0;
             Console.Clear();
 
-            //Block[] blocks = new Block[0];
+            SetUpGrid();
+
             List<BlockPrototype> blockPool = new List<BlockPrototype>();
             Random rng = new Random();
             DateTime time = DateTime.Now;
 
             // Generate the first block and place it at the start position
             (Block nextBlock, BlockPrototype currentPrototype) = GenerateBlock(ref blockPool, blockPrototypes, ref rng);
-            nextBlock.notAnObsticle = false;
+            nextBlock.outsideGrid = false;
             nextBlock.position.posX = START_X;
             nextBlock.position.posY = START_Y; objects.Add(nextBlock);
 
@@ -347,7 +367,7 @@ namespace Tetris
             (nextBlock, currentPrototype) = GenerateBlock(ref blockPool, blockPrototypes, ref rng);
             if (!Input.Program.gameData.extremeMode)
             {
-                nextBlock.notAnObsticle = true;
+                nextBlock.outsideGrid = true;
                 nextBlock.placed = true;
             }
             nextBlock.Draw();
@@ -368,7 +388,7 @@ namespace Tetris
                             // Update it so it can be at the center
                             // 1. Redraw it black so it's no longer visible
                             //    on the right side.
-                            nextBlock.placed = false;
+                            
                             nextBlock.color = Program.BACKGROUND_COLOR;
                             nextBlock.Draw();
                             nextBlock.color = nextBlock.prototype.color;
@@ -376,7 +396,8 @@ namespace Tetris
                             // 2. Update the position
                             nextBlock.position.posX = START_X;
                             nextBlock.position.posY = START_Y;
-                            nextBlock.notAnObsticle = false;
+                            nextBlock.outsideGrid = false;
+                            nextBlock.placed = false;
 
                             // 3. Add it back to the game objects for it to be ticked
                             objects.Add(nextBlock);
@@ -388,7 +409,7 @@ namespace Tetris
                             objects.Add(nextBlock);
 
                             // A block has been placed, so it needs to be checked if any rows are full
-                            for (int row = 0; row < staticGrid.GetLength(0) - 2; row++)
+                            for (int row = 1; row < staticGrid.GetLength(0) - 2; row++)
                             {
                                 // This algorithm seems painfuly inefficient, and it is, but
                                 // for some reason, nothing else seems to work.
@@ -435,7 +456,7 @@ namespace Tetris
                 // way to cheat.
                 if (Input.Program.ProcessKey(Input.Program.Input.RemoveLastRow))
                 {
-                    DeleteRow(ref objects, GRID_END - 1);
+                    DeleteRow(ref objects, GRID_HEIGHT - 1);
                 }
 
                 if (Input.Program.ProcessKey(Input.Program.Input.Exit))
@@ -534,7 +555,7 @@ namespace Tetris
             float deltaTime = (float)(DateTime.Now - startTime).TotalSeconds;
             startTime = DateTime.Now;
 
-            Console.SetCursorPosition(0, 1);
+            Console.SetCursorPosition(0, 0);
             Console.Write($"FPS: {(int)(1 / deltaTime)}; Speed: {block_speed}, Score: {score}");
 
             if (objects != null)
@@ -581,7 +602,7 @@ namespace Tetris
             pool.RemoveAt(index);
 
             var block = new Block(prototype, START_X, START_Y);
-            block.notAnObsticle = true;
+            block.outsideGrid = true;
 
 
             block.position.posX = 20;
@@ -952,7 +973,7 @@ namespace Tetris
 
         public string GetDescription()
         {
-            return "Makes the game a bit harder.";
+            return "Makes the game a bit harder.\n This was originally a bug and functionality is limited.";
         }
 
         public void Select()
@@ -1033,7 +1054,10 @@ namespace Tetris
         private float time;
         public ConsoleColor color;
 
-        public bool notAnObsticle;
+        /// <summary>
+        /// The block is displayed on the side as the next block if true.
+        /// </summary>
+        public bool outsideGrid;
 
         /// <summary>
         /// If the block is "placed", it can no longer move
@@ -1048,6 +1072,7 @@ namespace Tetris
         public void RemoveRow(int row)
         {
             if (!this.placed) return;
+            if (this.outsideGrid) return;
 
             int posInShape = row - this.position.posY;
             var originalPosition = this.position;
@@ -1159,7 +1184,7 @@ namespace Tetris
         {
             var newPos = this.position;
             var colour = this.color;
-            this.color = Program.BACKGROUND_COLOR;
+            this.color = outsideGrid ? Program.BACKGROUND_COLOR : Program.GRID_COLOR;
             this.position = originalSpace;
 
             if (this.position.rotation != newPos.rotation)
@@ -1193,7 +1218,7 @@ namespace Tetris
         /// <returns></returns>
         private bool PlaceInGrid(ref bool[,] currentGrid)
         {
-            if (this.notAnObsticle) return false;
+            if (this.outsideGrid) return false;
             for (int row = 0; row < currentShape.GetLength(0); row++)
             {
                 byte rowContents = currentShape[row];
@@ -1472,7 +1497,7 @@ namespace Tetris
             this.placed = false;
             this.time = 0;
             this.color = prototype.color;
-            this.notAnObsticle = false;
+            this.outsideGrid = false;
 
             for (int i = 0; i < this.currentShape.GetLength(0); i++)
             {
