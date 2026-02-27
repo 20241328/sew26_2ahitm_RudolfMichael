@@ -704,8 +704,10 @@ namespace Tetris
                 emptyRowString += ' ';
             }
 
+            int itemsCount = 0;
             for (int i = startIndex; i < startIndex + length && i < scoresSorted.Count; i++)
             {
+                itemsCount++;
                 Score item = scoresSorted[i];
 
                 Console.BackgroundColor = GetBackgroundColorForScore(item, i);
@@ -728,7 +730,7 @@ namespace Tetris
             }
 
 
-            int buttonsY = MAX_PLAYER_NAME_LENGTH + length - startIndex;
+            int buttonsY = 10 + itemsCount + 5;
             bool startOfList = startIndex == 0;
             var listEnded = startIndex + length > scoresSorted.Count;
             DrawButton("Previous", !startOfList, 10, buttonsY);
@@ -1365,7 +1367,7 @@ namespace Tetris
                     {
                         byte contents = 0;
 
-                        for (int j = 0; j < height; j++)
+                        for (int j = height-1; j >= 0; j--)
                         {
                             bool filled = prototype.shape[j, i];
                             if (filled)
