@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Media;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -95,6 +96,7 @@ namespace Tetris
 
 
         private static string[] options = new string[] { "Start Game", "Leaderboard", "Settings", "Manual", "Quit", };
+        private static SoundPlayer soundPlayer;
 
 
 
@@ -196,6 +198,7 @@ namespace Tetris
             new NamePreservationSetting(),
             new ExtremeModeSetting(),
             new TitleScreenSetting(),
+            new MusicSetting(),
         };
 
         /// <summary>
@@ -259,6 +262,8 @@ namespace Tetris
                 slowDownDrawing = false;
             }
 
+            // Start the sound if available
+            PlayMusic();
             
 
             if (playerName == "") RequestPlayerName();
@@ -896,6 +901,25 @@ namespace Tetris
             Console.Write(text);
         }
 
+        public static void PlayMusic()
+        {
+            if (Input.Program.gameData.playMusic)
+            {
+                if (File.Exists("791018.wav"))
+                {
+                    soundPlayer = new SoundPlayer("791018.wav");
+                    soundPlayer.PlayLooping();
+                }
+            } else
+            {
+                if (soundPlayer != null)
+                {
+                    soundPlayer.Stop();
+                    soundPlayer.Dispose();
+                    soundPlayer = null;
+                }
+            }
+        }
     }
 
     /// <summary>
@@ -1004,6 +1028,33 @@ namespace Tetris
         {
             Input.Program.gameData.showTitleScreen = !Input.Program.gameData.showTitleScreen;
             Input.Program.StoreGameData();
+        }
+    }
+
+
+    public class MusicSetting : ISetting
+    {
+        public string GetName()
+        {
+            return "Play Music";
+        }
+
+        public string GetValue()
+        {
+            return Input.Program.gameData.playMusic ? "Yes" : "No";
+        }
+
+        public string GetDescription()
+        {
+            return "If true, the original Tetris music will play.";
+        }
+
+        public void Select()
+        {
+            Input.Program.gameData.playMusic = !Input.Program.gameData.playMusic;
+            Input.Program.StoreGameData();
+
+            Program.PlayMusic();
         }
     }
 
@@ -1856,6 +1907,9 @@ namespace Input
         [JsonPropertyName("show_title_screen")]
         public bool showTitleScreen { get; set; }
 
+        [JsonPropertyName("play_music")]
+        public bool playMusic { get; set; }
+
 
         /// <summary>
         /// Sets the new highscore for a player if it is that player's best.
@@ -1890,6 +1944,7 @@ namespace Input
             data.preservePlayerName = false;
             data.extremeMode = false;
             data.showTitleScreen = true;
+            data.playMusic = true;
 
             return data;
         }
