@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using System.Threading;
+using System.Xml.Schema;
 using Input;
 
 namespace Tetris
@@ -282,7 +283,7 @@ namespace Tetris
 
             for (int i = 0; i < manual.Length; i++)
             {
-                Console.SetCursorPosition(10, 10 + i);
+                Console.SetCursorPosition(10, 6 + i);
                 Console.Write(manual[i]);
             }
 
@@ -643,7 +644,7 @@ namespace Tetris
 
                 for (int i = 0; i < bestScores.Count; i++)
                 {
-                    if (bestScores[i].value < pScore.value)
+                    if (bestScores[i].Value < pScore.Value)
                     {
                         foundPair = true;
                         bestScores.Insert(i, pScore);
@@ -684,7 +685,6 @@ namespace Tetris
             Console.Clear();
 
             int rowLength = 3 + MAX_PLAYER_NAME_LENGTH + 5 + 2 * 4;
-            string emptyRowString = "";
 
             int center = 10 + rowLength / 2;
 
@@ -697,12 +697,6 @@ namespace Tetris
             Console.SetCursorPosition(center - title.Length / 2, 5);    // Center the text above the board
             Console.Write(title);
 
-
-
-            for (int i = 0; i < rowLength; i++)
-            {
-                emptyRowString += ' ';
-            }
 
             int itemsCount = 0;
             for (int i = startIndex; i < startIndex + length && i < scoresSorted.Count; i++)
@@ -722,11 +716,10 @@ namespace Tetris
 
                 var posY = 10 + i - startIndex;
                 // Draw the background
-                Console.SetCursorPosition(10, posY);
-                Console.Write(emptyRowString);      
+                DrawBar(rowLength, (10, posY), Console.BackgroundColor);
                 // Draw the text
                 Console.SetCursorPosition(10, posY);
-                Console.Write($"{i + 1,3}.\t{item.playerName,MAX_PLAYER_NAME_LENGTH}\t{item.value,5}");
+                Console.Write($"{i + 1,3}.\t{item.playerName,MAX_PLAYER_NAME_LENGTH}\t{item.Value,5}");
             }
 
 
@@ -850,6 +843,38 @@ namespace Tetris
                 }
             }
         }
+
+
+        /// <summary>
+        /// Creates a bar with the background being the specified color.
+        /// The background color stays as provided after the function exits.
+        /// </summary>
+        /// <param name="length">The length (or the rest of the line if null)</param>
+        /// <param name="pos">The position of the bar (or the current cursor position if null)</param>
+        /// <param name="color">The color the bar should have (or the background color if unspecified)</param>
+        public static void DrawBar(int? length, (int, int)? pos, ConsoleColor color = Program.BACKGROUND_COLOR)
+        {
+            string text = "";
+            (int posX, int posY) = pos ?? (Console.CursorLeft, Console.CursorTop);
+            int? length_ = length;
+
+            if (length_ == null)
+            {
+                length = Console.WindowWidth - posX;
+            }
+
+            for (int i = 0; i < length_; i++)
+            {
+                text += ' ';
+            }
+
+            var backgroundColor = Console.BackgroundColor;
+
+            Console.SetCursorPosition(posX, posY);
+            Console.BackgroundColor = color;
+            Console.Write(text);
+        }
+
     }
 
     /// <summary>
@@ -1531,6 +1556,8 @@ namespace Tetris
         /// <param name="index"></param>
         void RemoveRow(int index);
     }
+
+    
 }
 
 namespace Input
@@ -1703,46 +1730,9 @@ namespace Input
             }
 
 
-            string[] optionsClone = options;
-
-            for (int i = 0; i < optionsClone.Length; i++)
-            {
-                while (options[i].Length <= longestEntry)
-                {
-                    options[i] += " ";
-                }
-            }
-
-
             while (!currentInputs.Contains(Input.Exit))
             {
                 Console.ForegroundColor = ConsoleColor.White;
-                if (ProcessKey(Input.RotateUp))
-                {
-                    Console.SetCursorPosition(0, MAX_Y - 1);
-                    Console.Write("-----------------");
-                    if (selectedEntry > 0)
-                    {
-                        selectedEntry--;
-                    }
-                }
-
-                if (ProcessKey(Input.Down))
-                {
-                    Console.SetCursorPosition(0, MAX_Y - 1);
-                    Console.Write("-----------------");
-                    if (selectedEntry < options.Length - 1)
-                    {
-                        selectedEntry++;
-                        Console.Clear();
-                    }
-                }
-
-                if (ProcessKey(Input.Select))
-                {
-                    return;
-                }
-
 
 
                 Console.SetCursorPosition(10, 2);
@@ -1750,25 +1740,76 @@ namespace Input
 
                 for (int i = 0; i < options.Length; i++)
                 {
-                    if (i == selectedEntry)
-                    {
-                        Console.BackgroundColor = ConsoleColor.DarkRed;
-                    }
-                    else
-                    {
-                        Console.BackgroundColor = ConsoleColor.Black;
-                    }
-                    Console.SetCursorPosition(10, 4 + i);
-                    Console.WriteLine(" " + options[i]);
+                    Tetris.Program.DrawBar(longestEntry + 2, (10, 4 + i), i == selectedEntry ? ConsoleColor.Blue : Tetris.Program.BACKGROUND_COLOR);
+                    Console.SetCursorPosition(11, 4 + i);
+                    Console.WriteLine(options[i]);
                 }
 
-                Thread.Sleep(16);
+
+                string warningText = $"Scale down font (height: {Console.WindowHeight}, required: {MAX_Y})";
+                bool resolutionSufficient = !(Console.WindowHeight < MAX_Y);
+                if (!resolutionSufficient)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.Write(warningText);
+                    Console.ForegroundColor = ConsoleColor.White;
+                } else
+                {
+                    Tetris.Program.DrawBar(warningText.Length + 1, null);
+                }
+
+
+                
+
+                var currentResolutionX = Console.WindowHeight;
+                while (true)
+                {
+                    if (ProcessKey(Input.RotateUp))
+                    {
+                        if (selectedEntry > 0)
+                        {
+                            selectedEntry--;
+                            break;
+                        }
+                    }
+
+                    if (ProcessKey(Input.Down))
+                    {
+                        if (selectedEntry < options.Length - 1)
+                        {
+                            selectedEntry++;
+                            break;
+                        }
+                    }
+
+                    if (ProcessKey(Input.Exit))
+                    {
+                        Program.running = false;
+                        StoreGameData();
+                        Environment.Exit(0);
+                    }
+
+                    if (ProcessKey(Input.Select))
+                    {
+                        if (resolutionSufficient)
+                        {
+                            return;
+                        }
+                    }
+
+                    if (Console.WindowHeight != currentResolutionX)
+                    {
+                        break;
+                    }
+
+                    Thread.Sleep(16);
+                }
             }
 
             Program.running = false;
             StoreGameData();
 
-            System.Environment.Exit(0);
+            Environment.Exit(0);
 
         }
     }
@@ -1808,9 +1849,9 @@ namespace Input
                 Score playerScore = highscores[i];
 
                 if (playerScore.playerName != player) continue;
-                if (playerScore.value > score) return;
+                if (playerScore.Value > score) return;
 
-                highscores[i].value = score;
+                highscores[i].Value = score;
                 return;
             }
 
@@ -1834,13 +1875,13 @@ namespace Input
         [JsonPropertyName("player_name")]
         public string playerName { get; set; }
         [JsonPropertyName("value")]
-        public int value { get; set; }
+        public int Value { get; set; }
 
 
         public Score(string playerName, int value)
         {
             this.playerName = playerName;
-            this.value = value;
+            this.Value = value;
         }
     }
 }
