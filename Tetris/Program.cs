@@ -8,7 +8,6 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using System.Threading;
-using System.Xml.Schema;
 using Input;
 
 namespace Tetris
@@ -33,7 +32,6 @@ namespace Tetris
 
         public static int score;
         public static string playerName = "";
-        private static List<IGameObject> objects = new List<IGameObject>();
         public static float block_speed = 1f;
         public static bool slowDownDrawing = false;
         public static BlockPrototype[] blockPrototypes = {
@@ -95,12 +93,14 @@ namespace Tetris
             };
 
 
-        private static string[] options = new string[] { "Start Game", "Leaderboard", "Settings", "Manual", "Quit", };
+        private static readonly string[] options = new string[] { "Start Game", "Leaderboard", "Settings", "Manual", "Quit", };
+
         private static SoundPlayer soundPlayer;
+        private static List<IGameObject> objects = new List<IGameObject>();
 
 
 
-        private static string[] manual = new string[]
+        private static readonly string[] manual = new string[]
         {
             "Use the arrow keys to move and rotate the blocks.",
             "For every block that lands, your score is increased.",
@@ -255,7 +255,7 @@ namespace Tetris
             Console.Clear();
 
 
-            if (Input.Program.gameData.showTitleScreen)
+            if (Input.Program.gameData.ShowTitleScreen)
             {
                 slowDownDrawing = true;
                 ShowTitle();
@@ -362,15 +362,15 @@ namespace Tetris
             DateTime time = DateTime.Now;
 
             // Generate the first block and place it at the start position
-            (Block nextBlock, BlockPrototype currentPrototype) = GenerateBlock(ref blockPool, blockPrototypes, ref rng);
+            (Block nextBlock, _) = GenerateBlock(ref blockPool, blockPrototypes, ref rng);
             nextBlock.outsideGrid = false;
             nextBlock.position.posX = START_X;
             nextBlock.position.posY = START_Y; objects.Add(nextBlock);
 
 
             // Generate the next block and place it where you can see the next block
-            (nextBlock, currentPrototype) = GenerateBlock(ref blockPool, blockPrototypes, ref rng);
-            if (!Input.Program.gameData.extremeMode)
+            (nextBlock, _) = GenerateBlock(ref blockPool, blockPrototypes, ref rng);
+            if (!Input.Program.gameData.ExtremeMode)
             {
                 nextBlock.outsideGrid = true;
                 nextBlock.placed = true;
@@ -408,7 +408,7 @@ namespace Tetris
                             objects.Add(nextBlock);
 
                             // Generate the next block
-                            (nextBlock, currentPrototype) = GenerateBlock(ref blockPool, blockPrototypes, ref rng);
+                            (nextBlock, _) = GenerateBlock(ref blockPool, blockPrototypes, ref rng);
                             nextBlock.placed = true;
                             nextBlock.Draw();
                             objects.Add(nextBlock);
@@ -606,7 +606,8 @@ namespace Tetris
             BlockPrototype prototype = pool[index];
             pool.RemoveAt(index);
 
-            var block = new Block(prototype, START_X, START_Y);
+            Block block1 = new Block(prototype, START_X, START_Y);
+            var block = block1;
             block.outsideGrid = true;
 
 
@@ -654,7 +655,7 @@ namespace Tetris
                 RequestPlayerName();
             }
 
-            Input.Program.gameData.lastPlayer = playerName;
+            Input.Program.gameData.LastPlayer = playerName;
 
             Console.Clear();
         }
@@ -664,7 +665,7 @@ namespace Tetris
         {
             List<Score> bestScores = new List<Score>();
 
-            foreach (Score pScore in Input.Program.gameData.highscores)
+            foreach (Score pScore in Input.Program.gameData.Highscores)
             {
                 bool foundPair = false;
 
@@ -745,7 +746,7 @@ namespace Tetris
                 DrawBar(rowLength, (10, posY), Console.BackgroundColor);
                 // Draw the text
                 Console.SetCursorPosition(10, posY);
-                Console.Write($"{i + 1,3}.\t{item.playerName,MAX_PLAYER_NAME_LENGTH}\t{item.Value,5}");
+                Console.Write($"{i + 1,3}.\t{item.PlayerName,MAX_PLAYER_NAME_LENGTH}\t{item.Value,5}");
             }
 
 
@@ -765,7 +766,7 @@ namespace Tetris
         /// <returns></returns>
         static ConsoleColor GetBackgroundColorForScore(Score score, int index)
         {
-            if (score.playerName == playerName)
+            if (score.PlayerName == playerName)
             {
                 return ConsoleColor.Red;
             }
@@ -882,19 +883,12 @@ namespace Tetris
         {
             string text = "";
             (int posX, int posY) = pos ?? (Console.CursorLeft, Console.CursorTop);
-            int? length_ = length;
-
-            if (length_ == null)
-            {
-                length = Console.WindowWidth - posX;
-            }
+            int? length_ = length ?? Console.WindowWidth - posX;
 
             for (int i = 0; i < length_; i++)
             {
                 text += ' ';
             }
-
-            var backgroundColor = Console.BackgroundColor;
 
             Console.SetCursorPosition(posX, posY);
             Console.BackgroundColor = color;
@@ -903,7 +897,7 @@ namespace Tetris
 
         public static void PlayMusic()
         {
-            if (Input.Program.gameData.playMusic)
+            if (Input.Program.gameData.PlayMusic)
             {
                 if (File.Exists("791018.wav"))
                 {
@@ -968,7 +962,7 @@ namespace Tetris
 
         public string GetValue()
         {
-            return Input.Program.gameData.preservePlayerName ? "Yes" : "No";
+            return Input.Program.gameData.PreservePlayerName ? "Yes" : "No";
         }
 
         public string GetDescription()
@@ -978,7 +972,7 @@ namespace Tetris
 
         public void Select()
         {
-            Input.Program.gameData.preservePlayerName = !Input.Program.gameData.preservePlayerName;
+            Input.Program.gameData.PreservePlayerName = !Input.Program.gameData.PreservePlayerName;
             Input.Program.StoreGameData();
         }
     }
@@ -992,7 +986,7 @@ namespace Tetris
 
         public string GetValue()
         {
-            return Input.Program.gameData.extremeMode ? "Yes" : "No";
+            return Input.Program.gameData.ExtremeMode ? "Yes" : "No";
         }
 
         public string GetDescription()
@@ -1002,7 +996,7 @@ namespace Tetris
 
         public void Select()
         {
-            Input.Program.gameData.extremeMode = !Input.Program.gameData.extremeMode;
+            Input.Program.gameData.ExtremeMode = !Input.Program.gameData.ExtremeMode;
             Input.Program.StoreGameData();
         }
     }
@@ -1016,7 +1010,7 @@ namespace Tetris
 
         public string GetValue()
         {
-            return Input.Program.gameData.showTitleScreen ? "Yes" : "No";
+            return Input.Program.gameData.ShowTitleScreen ? "Yes" : "No";
         }
 
         public string GetDescription()
@@ -1026,7 +1020,7 @@ namespace Tetris
 
         public void Select()
         {
-            Input.Program.gameData.showTitleScreen = !Input.Program.gameData.showTitleScreen;
+            Input.Program.gameData.ShowTitleScreen = !Input.Program.gameData.ShowTitleScreen;
             Input.Program.StoreGameData();
         }
     }
@@ -1041,7 +1035,7 @@ namespace Tetris
 
         public string GetValue()
         {
-            return Input.Program.gameData.playMusic ? "Yes" : "No";
+            return Input.Program.gameData.PlayMusic ? "Yes" : "No";
         }
 
         public string GetDescription()
@@ -1051,9 +1045,10 @@ namespace Tetris
 
         public void Select()
         {
-            Input.Program.gameData.playMusic = !Input.Program.gameData.playMusic;
+            Input.Program.gameData.PlayMusic = !Input.Program.gameData.PlayMusic;
             Input.Program.StoreGameData();
 
+            
             Program.PlayMusic();
         }
     }
@@ -1403,8 +1398,6 @@ namespace Tetris
                 this.time = 0;
                 this.position.posY++;
 
-                int lowerEdgePos = this.position.posY + this.GetHeightBlocks();
-                int lowerEdgePosPhysical = lowerEdgePos * Block.tileHeight;
                 if (InterferesWithGrid(grid)/*lowerEdgePosPhysical>=Programm.GRID_END*/)
                 {
                     Tetris.Program.score++;
@@ -1433,6 +1426,8 @@ namespace Tetris
         public void Rotate(BlockPrototype prototype)
         {
             this.position.rotation = (byte)((this.position.rotation + 1) % 4);
+
+            if (prototype == null) return;
 
             switch (this.position.rotation)
             {
@@ -1690,9 +1685,9 @@ namespace Input
                 string jsonString = File.ReadAllText(SAVE_FILE_NAME);
                 gameData = JsonSerializer.Deserialize<GameData>(jsonString);
 
-                if (gameData.preservePlayerName)
+                if (gameData.PreservePlayerName)
                 {
-                    Tetris.Program.playerName = gameData.lastPlayer;
+                    Tetris.Program.playerName = gameData.LastPlayer;
                 }
             } else
             {
@@ -1705,17 +1700,17 @@ namespace Input
         /// </summary>
         public static void StoreGameData()
         {
-            var name = gameData.lastPlayer;
+            var name = gameData.LastPlayer;
 
-            if (!gameData.preservePlayerName)
+            if (!gameData.PreservePlayerName)
             {
-                gameData.lastPlayer = "";
+                gameData.LastPlayer = "";
             }
 
             string jsonString = JsonSerializer.Serialize(gameData);
             File.WriteAllText(SAVE_FILE_NAME, jsonString);
 
-            gameData.lastPlayer = name;
+            gameData.LastPlayer = name;
         }
 
         public enum Input
@@ -1755,7 +1750,7 @@ namespace Input
 
 
 
-        public static void Start(string[] args)
+        public static void Start(string[] _)
         {
             // parallele Methode zum Einlesen des Tastendrucks
             var myThread = new Thread(Eingabe);
@@ -1893,22 +1888,22 @@ namespace Input
     public class GameData
     {
         [JsonPropertyName("highscores")]
-        public List<Score> highscores { get; set; }
+        public List<Score> Highscores { get; set; }
 
         [JsonPropertyName("preserve_player_name")]
-        public bool preservePlayerName { get; set; }
+        public bool PreservePlayerName { get; set; }
 
         [JsonPropertyName("last_player")]
-        public string lastPlayer { get; set; }
+        public string LastPlayer { get; set; }
 
         [JsonPropertyName("extreme_mode")]
-        public bool extremeMode { get; set; }
+        public bool ExtremeMode { get; set; }
 
         [JsonPropertyName("show_title_screen")]
-        public bool showTitleScreen { get; set; }
+        public bool ShowTitleScreen { get; set; }
 
         [JsonPropertyName("play_music")]
-        public bool playMusic { get; set; }
+        public bool PlayMusic { get; set; }
 
 
         /// <summary>
@@ -1918,33 +1913,35 @@ namespace Input
         /// <param name="score">The score that player reached</param>
         public void RegisterScore(string player, int score)
         {
-            if (highscores == null)
+            if (Highscores == null)
             {
-                highscores = new List<Score>();
+                Highscores = new List<Score>();
             }
 
-            for (int i = 0; i < highscores.Count; i++)
+            for (int i = 0; i < Highscores.Count; i++)
             {
-                Score playerScore = highscores[i];
+                Score playerScore = Highscores[i];
 
-                if (playerScore.playerName != player) continue;
+                if (playerScore.PlayerName != player) continue;
                 if (playerScore.Value > score) return;
 
-                highscores[i].Value = score;
+                Highscores[i].Value = score;
                 return;
             }
 
-            highscores.Add(new Score(player, score));
+            Highscores.Add(new Score(player, score));
         }
 
         public static GameData GetNew()
         {
-            GameData data = new GameData();
-            data.highscores = new List<Score>();
-            data.preservePlayerName = false;
-            data.extremeMode = false;
-            data.showTitleScreen = true;
-            data.playMusic = true;
+            var data = new GameData
+            {
+                Highscores = new List<Score>(),
+                PreservePlayerName = false,
+                ExtremeMode = false,
+                ShowTitleScreen = true,
+                PlayMusic = true
+            };
 
             return data;
         }
@@ -1953,14 +1950,14 @@ namespace Input
     public class Score
     {
         [JsonPropertyName("player_name")]
-        public string playerName { get; set; }
+        public string PlayerName { get; set; }
         [JsonPropertyName("value")]
         public int Value { get; set; }
 
 
         public Score(string playerName, int value)
         {
-            this.playerName = playerName;
+            this.PlayerName = playerName;
             this.Value = value;
         }
     }
