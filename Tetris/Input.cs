@@ -114,6 +114,7 @@ namespace Input
                 case ConsoleKey.Enter:
                     return Input.Select;
                 case ConsoleKey.Escape:
+                    currentInputs = new List<Input>();
                     return Input.Exit;
                 case ConsoleKey.L:
                     return Input.RemoveLastRow;
