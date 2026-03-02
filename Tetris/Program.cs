@@ -9,6 +9,8 @@ using System.Threading;
 using Input;
 
 
+// Michael Rudolf - 2AHITM - Tetris
+
 namespace Tetris
 {
     internal class Program
