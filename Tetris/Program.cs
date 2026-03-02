@@ -36,7 +36,7 @@ namespace Tetris
         
 
 
-        private static readonly string[] options = new string[] { "Start Game", "Leaderboard", "Settings", "Manual", "Quit", };
+        private static readonly string[] options = new string[] { "Start Game", "Highscores", "Settings", "Manual", "Quit", };
 
         private static SoundPlayer soundPlayer;
         private static List<IGameObject> objects = new List<IGameObject>();
@@ -117,6 +117,7 @@ namespace Tetris
 
         static void Main(string[] args)
         {
+            // Set the encoding to en-/de-code special characters
             Console.OutputEncoding = Encoding.UTF8;
             Console.InputEncoding = Encoding.UTF8;
 
@@ -125,6 +126,7 @@ namespace Tetris
 
             Input.Program.Start(args);
             Input.Program.LoadGameData();
+
             Console.Clear();
 
 
@@ -135,10 +137,10 @@ namespace Tetris
                 slowDownDrawing = false;
             }
 
-            // Start the sound if available
+            // Start the sound if available & requested
             PlayMusic();
             
-
+            // Ask the player for their name if it hasn't been loaded from the game data.
             if (playerName == "") RequestPlayerName();
 
 
@@ -156,7 +158,7 @@ namespace Tetris
                         Input.Program.StoreGameData();
                         break;
                     case 1:
-                        ShowLeaderboard();
+                        ShowHighscores();
                         break;
                     case 2:
                         ShowSettings();
@@ -321,6 +323,7 @@ namespace Tetris
 
                             if (repeat)
                             {
+                                SetUpGrid();
                                 continue;
                             }
                             return;
@@ -534,7 +537,10 @@ namespace Tetris
         }
 
 
-        static void ShowLeaderboard()
+        /// <summary>
+        /// Shows highscores and allows the player to go to all pages.
+        /// </summary>
+        static void ShowHighscores()
         {
             List<Score> bestScores = new List<Score>();
 
@@ -560,18 +566,18 @@ namespace Tetris
 
             int page = 0;
 
-            DrawLeaderboard(page * 10, 10, bestScores);
+            DrawHighscores(page * 10, 10, bestScores);
 
             while (!Input.Program.ProcessKey(Input.Program.Input.Exit))
             {
                 if (Input.Program.ProcessKey(Input.Program.Input.Left))
                 {
-                    if (page > 0) DrawLeaderboard(--page * 10, 10, bestScores);
+                    if (page > 0) DrawHighscores(--page * 10, 10, bestScores);
                 }
 
                 if (Input.Program.ProcessKey(Input.Program.Input.Right))
                 {
-                    if (page < bestScores.Count / 10) DrawLeaderboard(++page * 10, 10, bestScores);
+                    if (page < bestScores.Count / 10) DrawHighscores(++page * 10, 10, bestScores);
                 }
 
                 Thread.Sleep(16);
@@ -580,7 +586,7 @@ namespace Tetris
             Console.Clear();
         }
 
-        static void DrawLeaderboard(int startIndex, int length, List<Score> scoresSorted)
+        static void DrawHighscores(int startIndex, int length, List<Score> scoresSorted)
         {
             Console.Clear();
 
@@ -592,7 +598,7 @@ namespace Tetris
 
             if (lastIndex > scoresSorted.Count) lastIndex = scoresSorted.Count;
 
-            string title = $"Leaderboard ({startIndex + 1}...{lastIndex} from {scoresSorted.Count})";
+            string title = $"Highscores ({startIndex + 1}...{lastIndex} from {scoresSorted.Count})";
 
             Console.SetCursorPosition(center - title.Length / 2, 5);    // Center the text above the board
             Console.Write(title);
@@ -667,6 +673,9 @@ namespace Tetris
             Console.BackgroundColor = Program.BACKGROUND_COLOR;
         }
 
+        /// <summary>
+        /// Opens and hosts the settings screen until it's exited.
+        /// </summary>
         static void ShowSettings()
         {
             Console.Clear();
@@ -768,13 +777,17 @@ namespace Tetris
             Console.Write(text);
         }
 
+        /// <summary>
+        /// Starts music or stops music, depending on the setting.
+        /// </summary>
         public static void PlayMusic()
         {
+            const string musicFileName = "791018.wav";
             if (Input.Program.gameData.PlayMusic)
             {
-                if (File.Exists("791018.wav"))
+                if (File.Exists(musicFileName))
                 {
-                    soundPlayer = new SoundPlayer("791018.wav");
+                    soundPlayer = new SoundPlayer(musicFileName);
                     soundPlayer.PlayLooping();
                 }
             } else

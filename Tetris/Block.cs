@@ -111,7 +111,7 @@ namespace Tetris
                         {
                             if (Program.slowDownDrawing)
                             {
-                                Thread.Sleep(50);
+                                Thread.Sleep(20);
                             }
                             if (x + 1 < width)
                             {
